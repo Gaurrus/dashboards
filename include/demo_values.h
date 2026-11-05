@@ -22,7 +22,7 @@ inline Values make(float t, bool ignitionOn = true) {
 
   v.speedKmh = 90.0f + 70.0f * sinf(t * 0.50f);
 
-  const float targetRpm = 900.0f + v.speedKmh * 28.0f + 400.0f * sinf(t * 1.7f);
+  const float targetRpm = 800.0f + v.speedKmh * 22.0f + 300.0f * sinf(t * 1.7f);
   v.rpm = targetRpm < 0.0f ? 0.0f : targetRpm;
 
   v.coolantC = 88.0f + 14.0f * sinf(t * 0.18f);

@@ -183,22 +183,22 @@ uint32_t lerpColor(uint32_t from, uint32_t to, float t) {
 }
 
 uint32_t rpmColor(float value) {
-  if (value <= 3000.0f) {
+  if (value <= 2500.0f) {
     return COL_DARK_GREEN;
   }
-  if (value >= 5000.0f) {
+  if (value >= 4500.0f) {
     return COL_RED;
   }
+  if (value < 3000.0f) {
+    return lerpColor(COL_DARK_GREEN, COL_GREEN, (value - 2500.0f) / 500.0f);
+  }
   if (value < 3500.0f) {
-    return lerpColor(COL_DARK_GREEN, COL_GREEN, (value - 3000.0f) / 500.0f);
+    return lerpColor(COL_GREEN, COL_YELLOW, (value - 3000.0f) / 500.0f);
   }
   if (value < 4000.0f) {
-    return lerpColor(COL_GREEN, COL_YELLOW, (value - 3500.0f) / 500.0f);
+    return lerpColor(COL_YELLOW, COL_ORANGE, (value - 3500.0f) / 500.0f);
   }
-  if (value < 4500.0f) {
-    return lerpColor(COL_YELLOW, COL_ORANGE, (value - 4000.0f) / 500.0f);
-  }
-  return lerpColor(COL_ORANGE, COL_RED, (value - 4500.0f) / 500.0f);
+  return lerpColor(COL_ORANGE, COL_RED, (value - 4000.0f) / 500.0f);
 }
 
 Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
@@ -954,10 +954,10 @@ void init() {
                         -1.0f, 10.0f, 20.0f, false, 22, &lv_font_montserrat_48,
                         &lv_font_montserrat_24, &lv_font_montserrat_20);
 
-  g_rpm = createGauge(screen, 576, 125, SIDE_SIZE, "", "RPM x1000", 7000, COL_ORANGE,
-                      5000.0f / 7000.0f, 500.0f, 1000.0f, true, 14,
+  g_rpm = createGauge(screen, 576, 125, SIDE_SIZE, "", "RPM x1000", 5500, COL_ORANGE,
+                      4500.0f / 5500.0f, 500.0f, 1000.0f, true, 14,
                       &lv_font_montserrat_32, &lv_font_montserrat_12,
-                      &lv_font_montserrat_12, true, 3000.0f, 5000.0f, COL_DARK_GREEN,
+                      &lv_font_montserrat_12, true, 2500.0f, 4500.0f, COL_DARK_GREEN,
                       COL_RED, 100.0f, rpmColor);
 
   g_voltage = makeLabel(screen, "--.-V", &lv_font_montserrat_32, COL_GREEN);
@@ -1114,7 +1114,7 @@ void update(const Values& v) {
     Values selfTest = v;
     selfTest.speedKmh = 180.0f * sweep;
     selfTest.speedValid = true;
-    selfTest.rpm = 7000.0f * sweep;
+    selfTest.rpm = 5500.0f * sweep;
     selfTest.rpmValid = true;
     selfTest.coolantC = 40.0f + 90.0f * sweep;
     selfTest.coolantValid = true;

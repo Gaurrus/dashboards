@@ -41,8 +41,8 @@ constexpr uint32_t GPS_BAUD = 9600;
 
 // ===================== Gauge ranges =====================
 constexpr float SPEED_MAX_KMH = 180.0f;
-constexpr float RPM_MAX       = 7000.0f;
-constexpr float RPM_REDLINE   = 5500.0f;
+constexpr float RPM_MAX       = 5500.0f;
+constexpr float RPM_REDLINE   = 4500.0f;
 
 constexpr float TEMP_MIN_C  = 40.0f;
 constexpr float TEMP_MAX_C  = 130.0f;

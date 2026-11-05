@@ -238,5 +238,5 @@
   <text class="note" x="60" y="884" font-size="12">3.3V/GND — с гребёнок платы на все модули.</text>
   <text class="note" x="60" y="906" font-size="12">GT911 0x5D/0x14 · CH422G 0x20 · ADS1115 0x48 · MCP23017 0x21</text>
   <text class="note" x="60" y="928" font-size="12">1.6 D/TD: RPM с W-терминала генератора.</text>
-  <text class="note" x="60" y="950" font-size="12">Скорость — ABS → GPIO6; красная зона ~4500–4800.</text>
+  <text class="note" x="60" y="950" font-size="12">Скорость — ABS → GPIO6; тахометр 0–5500, красная с 4500.</text>
 </svg>
