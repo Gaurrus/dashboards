@@ -1,0 +1,394 @@
+#include "ui_lvgl.h"
+
+#include <cmath>
+#include <cstdio>
+#include <ctime>
+
+#include "lvgl.h"
+
+namespace {
+
+constexpr uint32_t COL_BG = 0x0B0E11;
+constexpr uint32_t COL_TRACK = 0x2A2F35;
+constexpr uint32_t COL_TEXT = 0xE6E6E6;
+constexpr uint32_t COL_DIM = 0x6B7280;
+constexpr uint32_t COL_CYAN = 0x22D3EE;
+constexpr uint32_t COL_ORANGE = 0xF59E0B;
+constexpr uint32_t COL_RED = 0xEF4444;
+constexpr uint32_t COL_GREEN = 0x22C55E;
+constexpr uint32_t COL_YELLOW = 0xEAB308;
+constexpr uint32_t COL_BLUE = 0x3B82F6;
+constexpr uint32_t COL_TICK = 0x9CA3AF;
+
+constexpr int SIDE_SIZE = 210;
+constexpr int SPEED_SIZE = 315;
+constexpr int CLOCK_SIZE = 210;
+
+struct Gauge {
+  lv_obj_t* arc = nullptr;
+  lv_obj_t* value = nullptr;
+  int32_t max = 0;
+  bool div1000 = false;
+};
+
+Gauge g_speed;
+Gauge g_rpm;
+
+// lv_line_set_points() keeps the pointer, so the point arrays must live forever.
+constexpr int kMaxTicks = 128;
+lv_point_t g_tickPoints[kMaxTicks][2];
+int g_tickPointCount = 0;
+
+lv_obj_t* g_tempBar = nullptr;
+lv_obj_t* g_tempLabel = nullptr;
+lv_obj_t* g_fuelBar = nullptr;
+lv_obj_t* g_fuelLabel = nullptr;
+lv_obj_t* g_voltage = nullptr;
+lv_obj_t* g_odo = nullptr;
+
+lv_obj_t* g_indOil = nullptr;
+lv_obj_t* g_indChg = nullptr;
+lv_obj_t* g_indGlow = nullptr;
+lv_obj_t* g_indBeam = nullptr;
+lv_obj_t* g_indLeft = nullptr;
+lv_obj_t* g_indRight = nullptr;
+
+lv_obj_t* g_clockTime = nullptr;
+lv_obj_t* g_clockSeconds = nullptr;
+
+lv_obj_t* makeLabel(lv_obj_t* parent, const char* text, const lv_font_t* font,
+                    uint32_t color) {
+  lv_obj_t* label = lv_label_create(parent);
+  lv_label_set_text(label, text);
+  lv_obj_set_style_text_font(label, font, 0);
+  lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  return label;
+}
+
+void addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rInner,
+             int rOuter, int width, uint32_t color) {
+  if (g_tickPointCount >= kMaxTicks) {
+    return;
+  }
+
+  const float rad = angleDeg * 3.14159265f / 180.0f;
+  lv_point_t* points = g_tickPoints[g_tickPointCount++];
+  points[0].x = (lv_coord_t)(cx + cosf(rad) * rInner);
+  points[0].y = (lv_coord_t)(cy + sinf(rad) * rInner);
+  points[1].x = (lv_coord_t)(cx + cosf(rad) * rOuter);
+  points[1].y = (lv_coord_t)(cy + sinf(rad) * rOuter);
+
+  lv_obj_t* line = lv_line_create(parent);
+  lv_line_set_points(line, points, 2);
+  lv_obj_set_size(line, size, size);
+  lv_obj_set_pos(line, 0, 0);
+  lv_obj_set_style_line_width(line, width, 0);
+  lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
+  lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
+}
+
+Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
+                  const char* unit, int32_t max, uint32_t accent, float redlineFrac,
+                  float tickStep, float labelStep, bool div1000, int arcWidth,
+                  const lv_font_t* valueFont, const lv_font_t* titleFont) {
+  lv_obj_t* box = lv_obj_create(parent);
+  lv_obj_remove_style_all(box);
+  lv_obj_set_size(box, size, size);
+  lv_obj_set_pos(box, x, y);
+  lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(box, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t* arc = lv_arc_create(box);
+  lv_obj_set_size(arc, size, size);
+  lv_obj_center(arc);
+  lv_arc_set_bg_angles(arc, 135, 45);
+  lv_arc_set_range(arc, 0, max);
+  lv_arc_set_value(arc, 0);
+  lv_obj_set_style_arc_width(arc, arcWidth, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(arc, arcWidth, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_color(arc, lv_color_hex(COL_TRACK), LV_PART_MAIN);
+  lv_obj_set_style_arc_color(arc, lv_color_hex(accent), LV_PART_INDICATOR);
+  lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR);
+  lv_obj_set_style_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB);
+  lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+
+  if (redlineFrac > 0.0f) {
+    lv_obj_t* red = lv_arc_create(box);
+    lv_obj_set_size(red, size, size);
+    lv_obj_center(red);
+    lv_arc_set_bg_angles(red, (int32_t)(135.0f + 270.0f * redlineFrac), 45);
+    lv_arc_set_range(red, 0, 100);
+    lv_arc_set_value(red, 0);
+    lv_obj_set_style_arc_width(red, arcWidth, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(red, lv_color_hex(COL_RED), LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(red, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    lv_obj_set_style_opa(red, LV_OPA_TRANSP, LV_PART_KNOB);
+    lv_obj_clear_flag(red, LV_OBJ_FLAG_CLICKABLE);
+  }
+
+  const int tickCount = (int)((float)max / tickStep + 0.5f);
+  const int ratio = (tickStep > 0.0f) ? (int)(labelStep / tickStep + 0.5f) : 1;
+  const int rOuter = size / 2 - arcWidth / 2 - 2;
+
+  for (int i = 0; i <= tickCount; ++i) {
+    const float tickValue = i * tickStep;
+    const float frac = tickValue / (float)max;
+    const float angle = 135.0f + 270.0f * frac;
+    const bool major = ratio > 0 && (i % ratio) == 0;
+    const bool red = redlineFrac > 0.0f && frac >= redlineFrac;
+    const uint32_t color = red ? COL_RED : (major ? COL_TICK : COL_DIM);
+
+    addTick(box, size, size / 2, size / 2, angle, rOuter - (major ? 13 : 7), rOuter,
+            major ? 3 : 2, color);
+
+    if (major) {
+      const float rad = angle * 3.14159265f / 180.0f;
+      const int rLabel = rOuter - 24;
+      const int dx = (int)(cosf(rad) * rLabel);
+      const int dy = (int)(sinf(rad) * rLabel);
+
+      char text[16];
+      if (div1000) {
+        snprintf(text, sizeof(text), "%.1f", tickValue / 1000.0f);
+      } else {
+        snprintf(text, sizeof(text), "%d", (int)(tickValue + 0.5f));
+      }
+      lv_obj_t* tick = makeLabel(box, text, &lv_font_montserrat_14,
+                                 red ? COL_RED : COL_DIM);
+      lv_obj_align(tick, LV_ALIGN_CENTER, dx, dy);
+    }
+  }
+
+  lv_obj_t* titleLabel = makeLabel(box, title, titleFont, COL_DIM);
+  lv_obj_align(titleLabel, LV_ALIGN_CENTER, 0, -(int)(size * 0.27f));
+
+  lv_obj_t* valueLabel = makeLabel(box, "--", valueFont, accent);
+  lv_obj_align(valueLabel, LV_ALIGN_CENTER, 0, 0);
+
+  lv_obj_t* unitLabel = makeLabel(box, unit, &lv_font_montserrat_20, COL_DIM);
+  lv_obj_align(unitLabel, LV_ALIGN_CENTER, 0, (int)(size * 0.17f));
+
+  Gauge g;
+  g.arc = arc;
+  g.value = valueLabel;
+  g.max = max;
+  g.div1000 = div1000;
+  return g;
+}
+
+void createClock(lv_obj_t* parent, int x, int y, int size) {
+  lv_obj_t* box = lv_obj_create(parent);
+  lv_obj_remove_style_all(box);
+  lv_obj_set_size(box, size, size);
+  lv_obj_set_pos(box, x, y);
+  lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(box, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t* ring = lv_obj_create(box);
+  lv_obj_remove_style_all(ring);
+  lv_obj_set_size(ring, size - 4, size - 4);
+  lv_obj_center(ring);
+  lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_border_width(ring, 6, 0);
+  lv_obj_set_style_border_color(ring, lv_color_hex(COL_TRACK), 0);
+  lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(ring, LV_OBJ_FLAG_CLICKABLE);
+
+  const int dotRadius = size / 2 - 18;
+  for (int i = 0; i < 12; ++i) {
+    const float rad = (i * 30.0f) * 3.14159265f / 180.0f;
+    const int dx = (int)(cosf(rad) * dotRadius);
+    const int dy = (int)(sinf(rad) * dotRadius);
+
+    lv_obj_t* dot = lv_obj_create(box);
+    lv_obj_remove_style_all(dot);
+    lv_obj_set_size(dot, (i % 3 == 0) ? 8 : 5, (i % 3 == 0) ? 8 : 5);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(dot, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+    lv_obj_align(dot, LV_ALIGN_CENTER, dx, dy);
+  }
+
+  lv_obj_t* caption = makeLabel(box, "TIME", &lv_font_montserrat_14, COL_DIM);
+  lv_obj_align(caption, LV_ALIGN_CENTER, 0, -62);
+
+  g_clockTime = makeLabel(box, "--:--", &lv_font_montserrat_48, COL_TEXT);
+  lv_obj_align(g_clockTime, LV_ALIGN_CENTER, 0, -6);
+
+  g_clockSeconds = makeLabel(box, "--", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_align(g_clockSeconds, LV_ALIGN_CENTER, 0, 44);
+}
+
+void updateGauge(Gauge& g, float value, bool valid, uint32_t accent) {
+  int32_t arcValue = valid ? (int32_t)(value + 0.5f) : 0;
+  if (arcValue < 0) {
+    arcValue = 0;
+  }
+  if (arcValue > g.max) {
+    arcValue = g.max;
+  }
+  lv_arc_set_value(g.arc, arcValue);
+  lv_obj_set_style_arc_color(g.arc, lv_color_hex(valid ? accent : COL_TRACK),
+                             LV_PART_INDICATOR);
+
+  char text[24];
+  if (!valid) {
+    snprintf(text, sizeof(text), "--");
+  } else if (g.div1000) {
+    snprintf(text, sizeof(text), "%.1f", value / 1000.0f);
+  } else {
+    snprintf(text, sizeof(text), "%d", (int)(value + 0.5f));
+  }
+  lv_label_set_text(g.value, text);
+}
+
+void setIndicator(lv_obj_t* label, bool on, uint32_t color) {
+  lv_obj_set_style_text_color(label, lv_color_hex(on ? color : COL_DIM), 0);
+}
+
+lv_obj_t* createBar(lv_obj_t* parent, int x, int y, int width, int32_t lo, int32_t hi,
+                    uint32_t color) {
+  lv_obj_t* bar = lv_bar_create(parent);
+  lv_obj_set_size(bar, width, 16);
+  lv_obj_set_pos(bar, x, y);
+  lv_bar_set_range(bar, lo, hi);
+  lv_bar_set_value(bar, lo, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(bar, lv_color_hex(COL_TRACK), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_radius(bar, 8, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(bar, lv_color_hex(color), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(bar, 8, LV_PART_INDICATOR);
+  lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+  return bar;
+}
+
+void updateBar(lv_obj_t* bar, lv_obj_t* label, const char* name, float value,
+               bool valid, bool warn, uint32_t color) {
+  char text[32];
+  if (valid) {
+    snprintf(text, sizeof(text), "%s %d", name, (int)(value + 0.5f));
+  } else {
+    snprintf(text, sizeof(text), "%s --", name);
+  }
+  lv_label_set_text(label, text);
+
+  lv_bar_set_value(bar, valid ? (int32_t)(value + 0.5f) : 0, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(bar, lv_color_hex(valid ? (warn ? COL_RED : color) : COL_TRACK),
+                            LV_PART_INDICATOR);
+}
+
+void updateClock() {
+  static int lastSecond = -1;
+
+  const time_t now = time(nullptr);
+  struct tm* tmv = localtime(&now);
+  if (tmv == nullptr || now < 1600000000) {
+    if (lastSecond != -1) {
+      lv_label_set_text(g_clockTime, "--:--");
+      lv_label_set_text(g_clockSeconds, "--");
+      lastSecond = -1;
+    }
+    return;
+  }
+
+  if (tmv->tm_sec == lastSecond) {
+    return;
+  }
+  lastSecond = tmv->tm_sec;
+
+  char text[8];
+  snprintf(text, sizeof(text), "%02d:%02d", tmv->tm_hour, tmv->tm_min);
+  lv_label_set_text(g_clockTime, text);
+
+  snprintf(text, sizeof(text), "%02d", tmv->tm_sec);
+  lv_label_set_text(g_clockSeconds, text);
+}
+
+}  // namespace
+
+namespace ui {
+
+void init() {
+  g_tickPointCount = 0;
+  lv_obj_t* screen = lv_scr_act();
+  lv_obj_set_style_bg_color(screen, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+
+  g_indOil = makeLabel(screen, "OIL", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_set_pos(g_indOil, 20, 8);
+  g_indChg = makeLabel(screen, "CHG", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_set_pos(g_indChg, 90, 8);
+  g_indGlow = makeLabel(screen, "GLOW", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_set_pos(g_indGlow, 160, 8);
+  g_indBeam = makeLabel(screen, "BEAM", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_set_pos(g_indBeam, 250, 8);
+  g_indLeft = makeLabel(screen, "<", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_set_pos(g_indLeft, 340, 8);
+  g_indRight = makeLabel(screen, ">", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_set_pos(g_indRight, 370, 8);
+
+  // Left: clock. Center: large speedometer. Right: tachometer.
+  createClock(screen, 14, 125, CLOCK_SIZE);
+
+  g_speed = createGauge(screen, 242, 75, SPEED_SIZE, "SPEED", "km/h", 180, COL_CYAN,
+                        -1.0f, 10.0f, 20.0f, false, 22, &lv_font_montserrat_48,
+                        &lv_font_montserrat_24);
+
+  g_rpm = createGauge(screen, 576, 125, SIDE_SIZE, "RPM x1000", "rpm", 7000, COL_ORANGE,
+                      5500.0f / 7000.0f, 500.0f, 1000.0f, true, 14,
+                      &lv_font_montserrat_32, &lv_font_montserrat_20);
+
+  g_voltage = makeLabel(screen, "--.-V", &lv_font_montserrat_32, COL_GREEN);
+  lv_obj_align(g_voltage, LV_ALIGN_CENTER, 0, 168);
+
+  g_odo = makeLabel(screen, "0.0 km", &lv_font_montserrat_20, COL_DIM);
+  lv_obj_align(g_odo, LV_ALIGN_CENTER, 0, 202);
+
+  g_tempLabel = makeLabel(screen, "TEMP --", &lv_font_montserrat_20, COL_TEXT);
+  lv_obj_set_pos(g_tempLabel, 14, 348);
+  g_tempBar = createBar(screen, 14, 376, 210, 40, 130, COL_GREEN);
+
+  g_fuelLabel = makeLabel(screen, "FUEL --", &lv_font_montserrat_20, COL_TEXT);
+  lv_obj_set_pos(g_fuelLabel, 576, 348);
+  g_fuelBar = createBar(screen, 576, 376, 210, 0, 100, COL_YELLOW);
+}
+
+void update(const Values& v) {
+  updateGauge(g_speed, v.speedKmh, v.speedValid, COL_CYAN);
+  updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
+
+  updateBar(g_tempBar, g_tempLabel, "TEMP C", v.coolantC, v.coolantValid, v.tempWarning,
+            COL_GREEN);
+  updateBar(g_fuelBar, g_fuelLabel, "FUEL %", v.fuelPct, v.fuelValid, v.fuelWarning,
+            COL_YELLOW);
+
+  char text[24];
+  if (v.batteryValid) {
+    snprintf(text, sizeof(text), "%.1fV", v.batteryV);
+  } else {
+    snprintf(text, sizeof(text), "--.-V");
+  }
+  lv_label_set_text(g_voltage, text);
+  const bool batteryOk = v.batteryValid && v.batteryV >= 11.0f && v.batteryV <= 15.0f;
+  lv_obj_set_style_text_color(g_voltage,
+                              lv_color_hex(v.batteryValid ? (batteryOk ? COL_GREEN : COL_RED)
+                                                          : COL_DIM),
+                              0);
+
+  snprintf(text, sizeof(text), "%.1f km", v.odometerKm);
+  lv_label_set_text(g_odo, text);
+
+  setIndicator(g_indOil, v.oilWarning, COL_RED);
+  setIndicator(g_indChg, v.chargeWarning, COL_RED);
+  setIndicator(g_indGlow, v.glowPlug, COL_YELLOW);
+  setIndicator(g_indBeam, v.highBeam, COL_BLUE);
+  setIndicator(g_indLeft, v.turnLeft, COL_ORANGE);
+  setIndicator(g_indRight, v.turnRight, COL_ORANGE);
+
+  updateClock();
+}
+
+}  // namespace ui

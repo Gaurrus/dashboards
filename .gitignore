@@ -1,0 +1,7 @@
+.pio/
+.vscode/
+.DS_Store
+sim/build/
+sim/third_party/lvgl/
+dist/
+waveshare/.pio/
