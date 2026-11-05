@@ -196,7 +196,8 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
   lv_obj_set_style_arc_width(arc, arcWidth, LV_PART_INDICATOR);
   lv_obj_set_style_arc_color(arc, lv_color_hex(COL_TRACK), LV_PART_MAIN);
   lv_obj_set_style_arc_color(arc, lv_color_hex(accent), LV_PART_INDICATOR);
-  lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_rounded(arc, false, LV_PART_MAIN);
+  lv_obj_set_style_arc_rounded(arc, false, LV_PART_INDICATOR);
   lv_obj_set_style_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB);
   lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
   g.arc = arc;
@@ -213,7 +214,8 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
     lv_arc_set_range(red, 0, 100);
     lv_arc_set_value(red, 0);
     lv_obj_set_style_arc_width(red, arcWidth, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(red, lv_color_hex(COL_RED), LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(red, false, LV_PART_MAIN);
+  lv_obj_set_style_arc_color(red, lv_color_hex(COL_RED), LV_PART_MAIN);
     lv_obj_set_style_arc_opa(red, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_set_style_opa(red, LV_OPA_TRANSP, LV_PART_KNOB);
     lv_obj_clear_flag(red, LV_OBJ_FLAG_CLICKABLE);
@@ -243,7 +245,7 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
       lv_arc_set_bg_angles(segment, (int32_t)startAngle, (int32_t)endAngle);
       lv_obj_set_style_arc_width(segment, arcWidth, LV_PART_MAIN);
       lv_obj_set_style_arc_color(segment, lv_color_hex(color), LV_PART_MAIN);
-      lv_obj_set_style_arc_rounded(segment, true, LV_PART_MAIN);
+      lv_obj_set_style_arc_rounded(segment, false, LV_PART_MAIN);
       lv_obj_set_style_arc_opa(segment, LV_OPA_TRANSP, LV_PART_INDICATOR);
       lv_obj_set_style_opa(segment, LV_OPA_TRANSP, LV_PART_KNOB);
       lv_obj_clear_flag(segment, LV_OBJ_FLAG_CLICKABLE);
@@ -735,7 +737,7 @@ void init() {
   lv_obj_remove_style_all(g_tempCover);
   lv_obj_set_pos(g_tempCover, 0, 0);
   lv_obj_set_size(g_tempCover, 210, 16);
-  lv_obj_set_style_radius(g_tempCover, 8, 0);
+  lv_obj_set_style_radius(g_tempCover, 0, 0);
   lv_obj_set_style_bg_color(g_tempCover, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(g_tempCover, LV_OPA_COVER, 0);
   lv_obj_clear_flag(g_tempCover, LV_OBJ_FLAG_SCROLLABLE);
@@ -776,7 +778,7 @@ void init() {
   lv_obj_remove_style_all(g_fuelCover);
   lv_obj_set_pos(g_fuelCover, 0, 0);
   lv_obj_set_size(g_fuelCover, 210, 16);
-  lv_obj_set_style_radius(g_fuelCover, 8, 0);
+  lv_obj_set_style_radius(g_fuelCover, 0, 0);
   lv_obj_set_style_bg_color(g_fuelCover, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(g_fuelCover, LV_OPA_COVER, 0);
   lv_obj_clear_flag(g_fuelCover, LV_OBJ_FLAG_SCROLLABLE);
