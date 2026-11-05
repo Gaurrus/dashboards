@@ -28,6 +28,7 @@ struct Values {
   bool turnLeft = false;
   bool turnRight = false;
   bool glowPlug = false;  // diesel glow plugs heating
+  bool parkingBrake = false;
 
   bool tempWarning = false;
   bool fuelWarning = false;

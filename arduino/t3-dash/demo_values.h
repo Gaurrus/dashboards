@@ -41,6 +41,7 @@ inline Values make(float t) {
   v.turnLeft = wrap(t, 8.0f) < 1.5f;
   v.turnRight = wrap(t, 11.0f) < 1.5f;
   v.glowPlug = wrap(t, 15.0f) < 3.0f;
+  v.parkingBrake = wrap(t, 13.0f) < 4.0f;
 
   return v;
 }

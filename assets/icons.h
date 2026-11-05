@@ -11,6 +11,7 @@ extern const lv_img_dsc_t icon_glow;
 extern const lv_img_dsc_t icon_beam_high;
 extern const lv_img_dsc_t icon_beam_low;
 extern const lv_img_dsc_t icon_fog;
+extern const lv_img_dsc_t icon_brake;
 
 #ifdef __cplusplus
 }
