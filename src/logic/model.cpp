@@ -37,6 +37,7 @@ void DashboardModel::update(const RawInputs& raw, float dt) {
   v_.oilWarning = raw.oilWarning;
   v_.chargeWarning = raw.chargeWarning;
   v_.highBeam = raw.highBeam;
+  v_.lowBeam = raw.lowBeam;
   v_.turnLeft = raw.turnLeft;
   v_.turnRight = raw.turnRight;
   v_.glowPlug = raw.glowPlug;

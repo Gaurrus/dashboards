@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <ctime>
 
+#include "icons.h"
 #include "lvgl.h"
 #include "vw_gif.h"
 
@@ -25,8 +26,6 @@ constexpr uint32_t COL_TURN = 0x2ECC71;
 
 constexpr int ARROW_W = 54;
 constexpr int ARROW_H = 32;
-constexpr int ICON_W = 30;
-constexpr int ICON_H = 30;
 constexpr int SIDE_SIZE = 210;
 constexpr int SPEED_SIZE = 315;
 constexpr int CLOCK_SIZE = 210;
@@ -64,11 +63,7 @@ lv_obj_t* g_iconOil = nullptr;
 lv_obj_t* g_iconChg = nullptr;
 lv_obj_t* g_iconGlow = nullptr;
 lv_obj_t* g_iconBeam = nullptr;
-lv_color_t g_oilIconBuf[ICON_W * ICON_H];
-lv_color_t g_chgIconBuf[ICON_W * ICON_H];
-lv_color_t g_glowIconBuf[ICON_W * ICON_H];
-lv_color_t g_beamIconBuf[ICON_W * ICON_H];
-
+lv_obj_t* g_iconLowBeam = nullptr;
 lv_obj_t* g_turnLeft = nullptr;
 lv_obj_t* g_turnRight = nullptr;
 lv_color_t g_leftArrowBuf[ARROW_W * ARROW_H];
@@ -448,100 +443,15 @@ void setIconState(lv_obj_t* icon, bool on) {
   lv_obj_set_style_img_opa(icon, on ? LV_OPA_COVER : LV_OPA_20, 0);
 }
 
-void iconFillRect(lv_obj_t* canvas, int x, int y, int w, int h, int radius,
-                  uint32_t color) {
-  lv_draw_rect_dsc_t dsc;
-  lv_draw_rect_dsc_init(&dsc);
-  dsc.bg_color = lv_color_hex(color);
-  dsc.bg_opa = LV_OPA_COVER;
-  dsc.radius = radius;
-  dsc.border_width = 0;
-  lv_canvas_draw_rect(canvas, x, y, w, h, &dsc);
-}
-
-void iconStrokeRect(lv_obj_t* canvas, int x, int y, int w, int h, int radius,
-                    int borderWidth, uint32_t color) {
-  lv_draw_rect_dsc_t dsc;
-  lv_draw_rect_dsc_init(&dsc);
-  dsc.bg_opa = LV_OPA_TRANSP;
-  dsc.radius = radius;
-  dsc.border_width = borderWidth;
-  dsc.border_color = lv_color_hex(color);
-  dsc.border_opa = LV_OPA_COVER;
-  lv_canvas_draw_rect(canvas, x, y, w, h, &dsc);
-}
-
-void iconPolygon(lv_obj_t* canvas, const lv_point_t* points, uint32_t count,
-                 uint32_t color) {
-  lv_draw_rect_dsc_t dsc;
-  lv_draw_rect_dsc_init(&dsc);
-  dsc.bg_color = lv_color_hex(color);
-  dsc.bg_opa = LV_OPA_COVER;
-  dsc.radius = 0;
-  dsc.border_width = 0;
-  lv_canvas_draw_polygon(canvas, points, count, &dsc);
-}
-
-void iconLine(lv_obj_t* canvas, const lv_point_t* points, uint32_t count, int width,
-              uint32_t color) {
-  lv_draw_line_dsc_t dsc;
-  lv_draw_line_dsc_init(&dsc);
-  dsc.color = lv_color_hex(color);
-  dsc.width = width;
-  dsc.opa = LV_OPA_COVER;
-  dsc.round_start = 1;
-  dsc.round_end = 1;
-  lv_canvas_draw_line(canvas, points, count, &dsc);
-}
-
-lv_obj_t* createIconCanvas(lv_obj_t* parent, int x, int y, lv_color_t* buffer) {
-  lv_obj_t* canvas = lv_canvas_create(parent);
-  lv_canvas_set_buffer(canvas, buffer, ICON_W, ICON_H, LV_IMG_CF_TRUE_COLOR);
-  lv_canvas_fill_bg(canvas, lv_color_hex(COL_BG), LV_OPA_COVER);
-  lv_obj_set_pos(canvas, x, y);
-  lv_obj_set_style_img_opa(canvas, LV_OPA_20, 0);
-  lv_obj_clear_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
-  return canvas;
-}
-
-void drawOilIcon(lv_obj_t* canvas) {
-  const uint32_t col = COL_RED;
-  static const lv_point_t spout[] = {{7, 14}, {11, 14}, {5, 5}, {2, 7}};
-  static const lv_point_t handle[] = {{10, 14}, {14, 9}, {18, 14}};
-
-  iconPolygon(canvas, spout, 4, col);
-  iconFillRect(canvas, 7, 14, 17, 11, 3, col);
-  iconLine(canvas, handle, 3, 2, col);
-  iconFillRect(canvas, 6, 26, 19, 2, 1, col);
-}
-
-void drawChargeIcon(lv_obj_t* canvas) {
-  const uint32_t col = COL_RED;
-  static const lv_point_t bolt[] = {{16, 7}, {9, 17}, {13, 17},
-                                    {11, 25}, {20, 14}, {15, 14}, {18, 7}};
-
-  iconStrokeRect(canvas, 4, 9, 20, 13, 2, 2, col);
-  iconFillRect(canvas, 25, 13, 3, 5, 1, col);
-  iconPolygon(canvas, bolt, 7, col);
-}
-
-void drawGlowIcon(lv_obj_t* canvas) {
-  static const lv_point_t coil[] = {{7, 6},  {23, 9},  {7, 12}, {23, 15},
-                                    {7, 18}, {23, 21}, {7, 24}};
-  iconLine(canvas, coil, 7, 3, COL_YELLOW);
-}
-
-void drawBeamIcon(lv_obj_t* canvas) {
-  const uint32_t col = COL_BLUE;
-  static const lv_point_t lamp[] = {{3, 8}, {11, 5}, {15, 8}, {15, 22}, {11, 25}, {3, 22}};
-  static const lv_point_t ray1[] = {{18, 9}, {27, 6}};
-  static const lv_point_t ray2[] = {{18, 15}, {28, 15}};
-  static const lv_point_t ray3[] = {{18, 21}, {27, 24}};
-
-  iconPolygon(canvas, lamp, 6, col);
-  iconLine(canvas, ray1, 2, 2, col);
-  iconLine(canvas, ray2, 2, 2, col);
-  iconLine(canvas, ray3, 2, 2, col);
+lv_obj_t* createStatusIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int x,
+                           uint32_t color) {
+  lv_obj_t* icon = lv_img_create(parent);
+  lv_img_set_src(icon, src);
+  lv_obj_set_pos(icon, x, 4);
+  lv_obj_set_style_img_recolor(icon, lv_color_hex(color), 0);
+  lv_obj_set_style_img_recolor_opa(icon, LV_OPA_COVER, 0);
+  lv_obj_set_style_img_opa(icon, LV_OPA_20, 0);
+  return icon;
 }
 
 lv_obj_t* createTurnArrow(lv_obj_t* parent, int x, int y, bool left,
@@ -691,7 +601,17 @@ void applyValues(const Values& v) {
   setIconState(g_iconOil, v.oilWarning);
   setIconState(g_iconChg, v.chargeWarning);
   setIconState(g_iconGlow, v.glowPlug);
-  setIconState(g_iconBeam, v.highBeam);
+
+  if (v.highBeam) {
+    lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_0, 0);
+    lv_obj_set_style_img_opa(g_iconBeam, LV_OPA_COVER, 0);
+  } else if (v.lowBeam) {
+    lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_COVER, 0);
+    lv_obj_set_style_img_opa(g_iconBeam, LV_OPA_0, 0);
+  } else {
+    lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_0, 0);
+    lv_obj_set_style_img_opa(g_iconBeam, LV_OPA_20, 0);
+  }
 
   const bool blinkOn = g_selfTestActive ? true : (((lv_tick_get() / 350U) & 1U) == 0U);
   setBlinking(g_turnLeft, v.turnLeft, blinkOn);
@@ -755,17 +675,11 @@ void init() {
   lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
   // Status icons are grouped in the middle of the top row.
-  g_iconOil = createIconCanvas(screen, 310, 4, g_oilIconBuf);
-  drawOilIcon(g_iconOil);
-
-  g_iconChg = createIconCanvas(screen, 360, 4, g_chgIconBuf);
-  drawChargeIcon(g_iconChg);
-
-  g_iconGlow = createIconCanvas(screen, 410, 4, g_glowIconBuf);
-  drawGlowIcon(g_iconGlow);
-
-  g_iconBeam = createIconCanvas(screen, 460, 4, g_beamIconBuf);
-  drawBeamIcon(g_iconBeam);
+  g_iconOil = createStatusIcon(screen, &icon_oil, 310, COL_RED);
+  g_iconChg = createStatusIcon(screen, &icon_charge, 360, COL_RED);
+  g_iconGlow = createStatusIcon(screen, &icon_glow, 410, COL_YELLOW);
+  g_iconLowBeam = createStatusIcon(screen, &icon_beam_low, 460, COL_GREEN);
+  g_iconBeam = createStatusIcon(screen, &icon_beam_high, 460, COL_BLUE);
 
   // Classic VW turn signal arrows: left on the left edge, right on the right edge.
   g_turnLeft = createTurnArrow(screen, 20, 2, true, g_leftArrowBuf);
@@ -922,6 +836,7 @@ void update(const Values& v) {
     selfTest.chargeWarning = true;
     selfTest.glowPlug = true;
     selfTest.highBeam = true;
+    selfTest.lowBeam = false;
     selfTest.turnLeft = true;
     selfTest.turnRight = true;
 

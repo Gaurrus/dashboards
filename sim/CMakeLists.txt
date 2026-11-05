@@ -19,6 +19,7 @@ add_executable(t3dash_sim
   main.cpp
   ../src/ui/lvgl/ui_lvgl.cpp
   ../assets/vw_gif.c
+  ../assets/icons.c
 )
 
 target_include_directories(t3dash_sim PRIVATE

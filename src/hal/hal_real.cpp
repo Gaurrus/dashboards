@@ -59,6 +59,7 @@ void Hal::begin() {
   pinMode(cfg::PIN_OIL, INPUT_PULLUP);
   pinMode(cfg::PIN_CHARGE, INPUT_PULLUP);
   pinMode(cfg::PIN_BEAM, INPUT_PULLUP);
+  pinMode(cfg::PIN_LOW_BEAM, INPUT_PULLUP);
   pinMode(cfg::PIN_TURN_L, INPUT_PULLUP);
   pinMode(cfg::PIN_TURN_R, INPUT_PULLUP);
   pinMode(cfg::PIN_GLOW, INPUT_PULLUP);
@@ -132,6 +133,7 @@ void Hal::poll(RawInputs& out) {
   out.oilWarning = digitalRead(cfg::PIN_OIL) == LOW;
   out.chargeWarning = digitalRead(cfg::PIN_CHARGE) == LOW;
   out.highBeam = digitalRead(cfg::PIN_BEAM) == LOW;
+  out.lowBeam = digitalRead(cfg::PIN_LOW_BEAM) == LOW;
   out.turnLeft = digitalRead(cfg::PIN_TURN_L) == LOW;
   out.turnRight = digitalRead(cfg::PIN_TURN_R) == LOW;
   out.glowPlug = digitalRead(cfg::PIN_GLOW) == LOW;

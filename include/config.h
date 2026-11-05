@@ -26,6 +26,7 @@ constexpr int PIN_RPM_IN = 34;  // PC817 collector, active-low pulse
 constexpr int PIN_OIL     = 25;
 constexpr int PIN_CHARGE  = 26;
 constexpr int PIN_BEAM    = 27;
+constexpr int PIN_LOW_BEAM = 5;
 constexpr int PIN_TURN_L  = 13;
 constexpr int PIN_TURN_R  = 14;
 constexpr int PIN_GLOW    = 12;  // diesel glow plug indicator (active-low via optocoupler)

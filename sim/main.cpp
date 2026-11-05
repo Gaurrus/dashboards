@@ -85,6 +85,7 @@ int main(int argc, char** argv) {
   const bool bootShot = argc >= 3 && SDL_strcmp(argv[2], "boot") == 0;
   const bool sweepShot = argc >= 3 && SDL_strcmp(argv[2], "sweep") == 0;
   const bool hotShot = argc >= 3 && SDL_strcmp(argv[2], "hot") == 0;
+  const bool lowShot = argc >= 3 && SDL_strcmp(argv[2], "low") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -144,7 +145,7 @@ int main(int argc, char** argv) {
     lv_tick_inc(2750);
   }
 
-  float t = 0.0f;
+  float t = lowShot ? 6.0f : 0.0f;
   uint32_t lastTick = SDL_GetTicks();
 
   for (int frame = 0; frame < 4; ++frame) {
