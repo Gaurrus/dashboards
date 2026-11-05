@@ -18,10 +18,12 @@ pkg_check_modules(SDL2_APP REQUIRED IMPORTED_TARGET sdl2)
 add_executable(t3dash_sim
   main.cpp
   ../src/ui/lvgl/ui_lvgl.cpp
+  ../assets/vw_gif.c
 )
 
 target_include_directories(t3dash_sim PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/../include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../assets
 )
 
 target_link_libraries(t3dash_sim PRIVATE

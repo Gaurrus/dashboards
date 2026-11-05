@@ -5,6 +5,7 @@
 #include <ctime>
 
 #include "lvgl.h"
+#include "vw_gif.h"
 
 namespace {
 
@@ -510,40 +511,9 @@ lv_obj_t* createSplash(lv_obj_t* parent) {
   lv_obj_clear_flag(splash, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(splash, LV_OBJ_FLAG_CLICKABLE);
 
-  lv_obj_t* emblem = lv_obj_create(splash);
-  lv_obj_remove_style_all(emblem);
-  lv_obj_set_size(emblem, 260, 260);
-  lv_obj_center(emblem);
-  lv_obj_set_style_bg_opa(emblem, LV_OPA_TRANSP, 0);
-
-  lv_obj_t* ring = lv_obj_create(emblem);
-  lv_obj_remove_style_all(ring);
-  lv_obj_set_size(ring, 240, 240);
-  lv_obj_center(ring);
-  lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_border_width(ring, 8, 0);
-  lv_obj_set_style_border_color(ring, lv_color_hex(0xD0D4DA), 0);
-  lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
-
-  static lv_point_t vPoints[] = {{70, 55}, {130, 145}, {190, 55}};
-  static lv_point_t wPoints[] = {
-      {55, 115}, {95, 200}, {130, 145}, {165, 200}, {205, 115}};
-
-  lv_obj_t* vLine = lv_line_create(emblem);
-  lv_obj_set_size(vLine, 260, 260);
-  lv_obj_set_pos(vLine, 0, 0);
-  lv_line_set_points(vLine, vPoints, 3);
-  lv_obj_set_style_line_width(vLine, 16, 0);
-  lv_obj_set_style_line_color(vLine, lv_color_hex(0xD0D4DA), 0);
-  lv_obj_set_style_line_rounded(vLine, true, 0);
-
-  lv_obj_t* wLine = lv_line_create(emblem);
-  lv_obj_set_size(wLine, 260, 260);
-  lv_obj_set_pos(wLine, 0, 0);
-  lv_line_set_points(wLine, wPoints, 5);
-  lv_obj_set_style_line_width(wLine, 16, 0);
-  lv_obj_set_style_line_color(wLine, lv_color_hex(0xD0D4DA), 0);
-  lv_obj_set_style_line_rounded(wLine, true, 0);
+  lv_obj_t* gif = lv_gif_create(splash);
+  lv_gif_set_src(gif, &vw_gif);
+  lv_obj_align(gif, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_move_foreground(splash);
   return splash;
