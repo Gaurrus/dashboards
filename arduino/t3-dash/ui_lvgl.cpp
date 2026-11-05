@@ -31,8 +31,8 @@ constexpr int SPEED_SIZE = 315;
 constexpr float SPEED_CX = 242.0f + SPEED_SIZE / 2.0f;
 constexpr float SPEED_CY = 75.0f + SPEED_SIZE / 2.0f;
 constexpr float ICON_ORBIT_R = 205.0f;
-constexpr float ICON_ORBIT_START_DEG = -28.0f;
-constexpr float ICON_ORBIT_STEP_DEG = 11.2f;
+constexpr float ICON_ORBIT_START_DEG = -40.0f;
+constexpr float ICON_ORBIT_STEP_DEG = 16.0f;
 constexpr int STATUS_ICON_SIZE = 30;
 constexpr int CLOCK_SIZE = 210;
 
