@@ -24,8 +24,6 @@ constexpr uint32_t COL_BLUE = 0x3B82F6;
 constexpr uint32_t COL_TICK = 0x9CA3AF;
 constexpr uint32_t COL_TURN = 0x2ECC71;
 
-constexpr int ARROW_W = 54;
-constexpr int ARROW_H = 32;
 constexpr int SIDE_SIZE = 210;
 constexpr int SPEED_SIZE = 315;
 constexpr int CLOCK_SIZE = 210;
@@ -68,8 +66,6 @@ lv_obj_t* g_iconFog = nullptr;
 lv_obj_t* g_iconBrake = nullptr;
 lv_obj_t* g_turnLeft = nullptr;
 lv_obj_t* g_turnRight = nullptr;
-lv_color_t g_leftArrowBuf[ARROW_W * ARROW_H];
-lv_color_t g_rightArrowBuf[ARROW_W * ARROW_H];
 
 lv_obj_t* g_clockTime = nullptr;
 lv_obj_t* g_hourLine = nullptr;
@@ -456,28 +452,15 @@ lv_obj_t* createStatusIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int x,
   return icon;
 }
 
-lv_obj_t* createTurnArrow(lv_obj_t* parent, int x, int y, bool left,
-                          lv_color_t* buffer) {
-  static const lv_point_t leftHead[] = {{7, 16}, {47, 2}, {47, 30}};
-  static const lv_point_t rightHead[] = {{46, 16}, {6, 2}, {6, 30}};
-
-  lv_obj_t* canvas = lv_canvas_create(parent);
-  lv_canvas_set_buffer(canvas, buffer, ARROW_W, ARROW_H, LV_IMG_CF_TRUE_COLOR);
-  lv_canvas_fill_bg(canvas, lv_color_hex(COL_BG), LV_OPA_COVER);
-
-  lv_draw_rect_dsc_t dsc;
-  lv_draw_rect_dsc_init(&dsc);
-  dsc.bg_color = lv_color_hex(COL_TURN);
-  dsc.bg_opa = LV_OPA_COVER;
-  dsc.radius = 0;
-  dsc.border_width = 0;
-
-  lv_canvas_draw_polygon(canvas, left ? leftHead : rightHead, 3, &dsc);
-
-  lv_obj_set_pos(canvas, x, y);
-  lv_obj_add_flag(canvas, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
-  return canvas;
+lv_obj_t* createTurnArrow(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y) {
+  lv_obj_t* arrow = lv_img_create(parent);
+  lv_img_set_src(arrow, src);
+  lv_obj_set_pos(arrow, x, y);
+  lv_obj_set_style_img_recolor(arrow, lv_color_hex(COL_TURN), 0);
+  lv_obj_set_style_img_recolor_opa(arrow, LV_OPA_COVER, 0);
+  lv_obj_add_flag(arrow, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(arrow, LV_OBJ_FLAG_CLICKABLE);
+  return arrow;
 }
 
 void setBlinking(lv_obj_t* arrow, bool active, bool blinkOn) {
@@ -688,8 +671,8 @@ void init() {
   g_iconBeam = createStatusIcon(screen, &icon_beam_high, 510, COL_BLUE);
 
   // Classic VW turn signal arrows: left on the left edge, right on the right edge.
-  g_turnLeft = createTurnArrow(screen, 20, 2, true, g_leftArrowBuf);
-  g_turnRight = createTurnArrow(screen, 726, 2, false, g_rightArrowBuf);
+  g_turnLeft = createTurnArrow(screen, &icon_arrow_left, 20, 8);
+  g_turnRight = createTurnArrow(screen, &icon_arrow_right, 726, 8);
 
   // Left: clock. Center: large speedometer. Right: tachometer.
   createClock(screen, 14, 125, CLOCK_SIZE);
