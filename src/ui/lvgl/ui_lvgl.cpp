@@ -739,10 +739,12 @@ void init() {
   lv_obj_clear_flag(g_fuelGradient, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(g_fuelGradient, LV_OBJ_FLAG_CLICKABLE);
 
-  // 0..40%: red -> orange, 40..70%: orange -> yellow, 70..100%: yellow -> green.
-  createGradientSegment(g_fuelGradient, 0, 84, COL_RED, COL_ORANGE);
-  createGradientSegment(g_fuelGradient, 84, 63, COL_ORANGE, COL_YELLOW);
-  createGradientSegment(g_fuelGradient, 147, 63, COL_YELLOW, COL_GREEN);
+  // 0..10%: red, 10..30%: red -> orange, 30..50%: orange -> yellow (20% span),
+  // 50..100%: yellow -> green.
+  createGradientSegment(g_fuelGradient, 0, 21, COL_RED, COL_RED);
+  createGradientSegment(g_fuelGradient, 21, 42, COL_RED, COL_ORANGE);
+  createGradientSegment(g_fuelGradient, 63, 42, COL_ORANGE, COL_YELLOW);
+  createGradientSegment(g_fuelGradient, 105, 105, COL_YELLOW, COL_GREEN);
 
   g_fuelCover = lv_obj_create(g_fuelGradient);
   lv_obj_remove_style_all(g_fuelCover);
