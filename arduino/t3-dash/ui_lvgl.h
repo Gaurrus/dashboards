@@ -8,5 +8,6 @@ namespace ui {
 
 void init();
 void update(const Values& v);
+void skipBoot();
 
 }  // namespace ui

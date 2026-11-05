@@ -81,6 +81,9 @@ void saveBmp(const char* path) {
 
 int main(int argc, char** argv) {
   const bool screenshot = argc >= 2;
+  const bool viaSdl = argc >= 3 && SDL_strcmp(argv[2], "sdl") == 0;
+  const bool bootShot = argc >= 3 && SDL_strcmp(argv[2], "boot") == 0;
+  const bool sweepShot = argc >= 3 && SDL_strcmp(argv[2], "sweep") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -128,6 +131,13 @@ int main(int argc, char** argv) {
   lv_disp_drv_register(&gDispDrv);
 
   ui::init();
+  if (screenshot && !bootShot && !sweepShot) {
+    ui::skipBoot();
+  }
+  if (sweepShot) {
+    ui::update(demo::make(0.0f));
+    lv_tick_inc(2300);
+  }
 
   float t = 0.0f;
   uint32_t lastTick = SDL_GetTicks();
@@ -146,7 +156,6 @@ int main(int argc, char** argv) {
     lv_obj_invalidate(lv_scr_act());
     lv_refr_now(lv_disp_get_default());
 
-    const bool viaSdl = argc >= 3 && SDL_strcmp(argv[2], "sdl") == 0;
     if (viaSdl) {
       present();
       SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(

@@ -73,6 +73,19 @@ lv_point_t g_hourHand[2];
 lv_point_t g_minuteHand[2];
 lv_point_t g_secondHand[2];
 
+constexpr uint32_t BOOT_SPLASH_MS = 1800;
+constexpr uint32_t BOOT_UP_MS = 900;
+constexpr uint32_t BOOT_HOLD_MS = 300;
+constexpr uint32_t BOOT_DOWN_MS = 1000;
+constexpr uint32_t BOOT_TOTAL_MS =
+    BOOT_SPLASH_MS + BOOT_UP_MS + BOOT_HOLD_MS + BOOT_DOWN_MS;
+
+lv_obj_t* g_splash = nullptr;
+bool g_bootStarted = false;
+bool g_bootSkipped = false;
+uint32_t g_bootStartMs = 0;
+bool g_selfTestActive = false;
+
 lv_obj_t* makeLabel(lv_obj_t* parent, const char* text, const lv_font_t* font,
                     uint32_t color) {
   lv_obj_t* label = lv_label_create(parent);
@@ -485,6 +498,94 @@ void updateBar(lv_obj_t* bar, lv_obj_t* label, const char* name, float value,
                             LV_PART_INDICATOR);
 }
 
+void updateClock();
+
+lv_obj_t* createSplash(lv_obj_t* parent) {
+  lv_obj_t* splash = lv_obj_create(parent);
+  lv_obj_remove_style_all(splash);
+  lv_obj_set_size(splash, 800, 480);
+  lv_obj_set_pos(splash, 0, 0);
+  lv_obj_set_style_bg_color(splash, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(splash, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(splash, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(splash, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t* emblem = lv_obj_create(splash);
+  lv_obj_remove_style_all(emblem);
+  lv_obj_set_size(emblem, 260, 260);
+  lv_obj_center(emblem);
+  lv_obj_set_style_bg_opa(emblem, LV_OPA_TRANSP, 0);
+
+  lv_obj_t* ring = lv_obj_create(emblem);
+  lv_obj_remove_style_all(ring);
+  lv_obj_set_size(ring, 240, 240);
+  lv_obj_center(ring);
+  lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_border_width(ring, 8, 0);
+  lv_obj_set_style_border_color(ring, lv_color_hex(0xD0D4DA), 0);
+  lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
+
+  static lv_point_t vPoints[] = {{70, 55}, {130, 145}, {190, 55}};
+  static lv_point_t wPoints[] = {
+      {55, 115}, {95, 200}, {130, 145}, {165, 200}, {205, 115}};
+
+  lv_obj_t* vLine = lv_line_create(emblem);
+  lv_obj_set_size(vLine, 260, 260);
+  lv_obj_set_pos(vLine, 0, 0);
+  lv_line_set_points(vLine, vPoints, 3);
+  lv_obj_set_style_line_width(vLine, 16, 0);
+  lv_obj_set_style_line_color(vLine, lv_color_hex(0xD0D4DA), 0);
+  lv_obj_set_style_line_rounded(vLine, true, 0);
+
+  lv_obj_t* wLine = lv_line_create(emblem);
+  lv_obj_set_size(wLine, 260, 260);
+  lv_obj_set_pos(wLine, 0, 0);
+  lv_line_set_points(wLine, wPoints, 5);
+  lv_obj_set_style_line_width(wLine, 16, 0);
+  lv_obj_set_style_line_color(wLine, lv_color_hex(0xD0D4DA), 0);
+  lv_obj_set_style_line_rounded(wLine, true, 0);
+
+  lv_obj_move_foreground(splash);
+  return splash;
+}
+
+void applyValues(const Values& v) {
+  updateGauge(g_speed, v.speedKmh, v.speedValid, COL_CYAN);
+  updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
+
+  updateBar(g_tempBar, g_tempLabel, "TEMP C", v.coolantC, v.coolantValid, v.tempWarning,
+            COL_GREEN);
+  updateBar(g_fuelBar, g_fuelLabel, "FUEL %", v.fuelPct, v.fuelValid, v.fuelWarning,
+            COL_YELLOW);
+
+  char text[24];
+  if (v.batteryValid) {
+    snprintf(text, sizeof(text), "%.1fV", v.batteryV);
+  } else {
+    snprintf(text, sizeof(text), "--.-V");
+  }
+  lv_label_set_text(g_voltage, text);
+  const bool batteryOk = v.batteryValid && v.batteryV >= 11.0f && v.batteryV <= 15.0f;
+  lv_obj_set_style_text_color(g_voltage,
+                              lv_color_hex(v.batteryValid ? (batteryOk ? COL_GREEN : COL_RED)
+                                                          : COL_DIM),
+                              0);
+
+  snprintf(text, sizeof(text), "%.1f km", v.odometerKm);
+  lv_label_set_text(g_odo, text);
+
+  setIconState(g_iconOil, v.oilWarning);
+  setIconState(g_iconChg, v.chargeWarning);
+  setIconState(g_iconGlow, v.glowPlug);
+  setIconState(g_iconBeam, v.highBeam);
+
+  const bool blinkOn = g_selfTestActive ? true : (((lv_tick_get() / 350U) & 1U) == 0U);
+  setBlinking(g_turnLeft, v.turnLeft, blinkOn);
+  setBlinking(g_turnRight, v.turnRight, blinkOn);
+
+  updateClock();
+}
+
 void updateClock() {
   static int lastSecond = -1;
 
@@ -532,6 +633,9 @@ namespace ui {
 
 void init() {
   g_tickPointCount = 0;
+  g_bootStarted = false;
+  g_bootSkipped = false;
+  g_selfTestActive = false;
   lv_obj_t* screen = lv_scr_act();
   lv_obj_set_style_bg_color(screen, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
@@ -578,43 +682,71 @@ void init() {
   g_fuelLabel = makeLabel(screen, "FUEL --", &lv_font_montserrat_20, COL_TEXT);
   lv_obj_set_pos(g_fuelLabel, 576, 348);
   g_fuelBar = createBar(screen, 576, 376, 210, 0, 100, COL_YELLOW);
+
+  g_splash = createSplash(screen);
 }
 
 void update(const Values& v) {
-  updateGauge(g_speed, v.speedKmh, v.speedValid, COL_CYAN);
-  updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
-
-  updateBar(g_tempBar, g_tempLabel, "TEMP C", v.coolantC, v.coolantValid, v.tempWarning,
-            COL_GREEN);
-  updateBar(g_fuelBar, g_fuelLabel, "FUEL %", v.fuelPct, v.fuelValid, v.fuelWarning,
-            COL_YELLOW);
-
-  char text[24];
-  if (v.batteryValid) {
-    snprintf(text, sizeof(text), "%.1fV", v.batteryV);
-  } else {
-    snprintf(text, sizeof(text), "--.-V");
+  if (!g_bootStarted) {
+    g_bootStarted = true;
+    g_bootStartMs = lv_tick_get();
   }
-  lv_label_set_text(g_voltage, text);
-  const bool batteryOk = v.batteryValid && v.batteryV >= 11.0f && v.batteryV <= 15.0f;
-  lv_obj_set_style_text_color(g_voltage,
-                              lv_color_hex(v.batteryValid ? (batteryOk ? COL_GREEN : COL_RED)
-                                                          : COL_DIM),
-                              0);
 
-  snprintf(text, sizeof(text), "%.1f km", v.odometerKm);
-  lv_label_set_text(g_odo, text);
+  const uint32_t elapsed =
+      g_bootSkipped ? (BOOT_TOTAL_MS + 1) : (lv_tick_get() - g_bootStartMs);
 
-  setIconState(g_iconOil, v.oilWarning);
-  setIconState(g_iconChg, v.chargeWarning);
-  setIconState(g_iconGlow, v.glowPlug);
-  setIconState(g_iconBeam, v.highBeam);
+  if (elapsed < BOOT_SPLASH_MS) {
+    updateClock();
+    return;
+  }
 
-  const bool blinkOn = ((lv_tick_get() / 350U) & 1U) == 0U;
-  setBlinking(g_turnLeft, v.turnLeft, blinkOn);
-  setBlinking(g_turnRight, v.turnRight, blinkOn);
+  if (g_splash != nullptr && !lv_obj_has_flag(g_splash, LV_OBJ_FLAG_HIDDEN)) {
+    lv_obj_add_flag(g_splash, LV_OBJ_FLAG_HIDDEN);
+  }
 
-  updateClock();
+  if (elapsed < BOOT_TOTAL_MS) {
+    const uint32_t phase = elapsed - BOOT_SPLASH_MS;
+    float sweep = 0.0f;
+    if (phase < BOOT_UP_MS) {
+      sweep = (float)phase / (float)BOOT_UP_MS;
+    } else if (phase < BOOT_UP_MS + BOOT_HOLD_MS) {
+      sweep = 1.0f;
+    } else {
+      sweep = 1.0f - (float)(phase - BOOT_UP_MS - BOOT_HOLD_MS) / (float)BOOT_DOWN_MS;
+      if (sweep < 0.0f) {
+        sweep = 0.0f;
+      }
+    }
+
+    Values selfTest = v;
+    selfTest.speedKmh = 180.0f * sweep;
+    selfTest.speedValid = true;
+    selfTest.rpm = 7000.0f * sweep;
+    selfTest.rpmValid = true;
+    selfTest.coolantC = 40.0f + 90.0f * sweep;
+    selfTest.coolantValid = true;
+    selfTest.tempWarning = false;
+    selfTest.fuelPct = 100.0f * sweep;
+    selfTest.fuelValid = true;
+    selfTest.fuelWarning = false;
+    selfTest.oilWarning = true;
+    selfTest.chargeWarning = true;
+    selfTest.glowPlug = true;
+    selfTest.highBeam = true;
+    selfTest.turnLeft = true;
+    selfTest.turnRight = true;
+
+    g_selfTestActive = true;
+    applyValues(selfTest);
+    return;
+  }
+
+  g_selfTestActive = false;
+  applyValues(v);
+}
+
+void skipBoot() {
+  g_bootSkipped = true;
 }
 
 }  // namespace ui
