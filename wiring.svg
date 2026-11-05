@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="980" viewBox="0 0 1600 980" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#546e7a"/>
+    </marker>
+    <style>
+      .title { font-family: Helvetica, Arial, sans-serif; font-weight: 700; fill: #102027; }
+      .sub { font-family: Helvetica, Arial, sans-serif; fill: #546e7a; }
+      .h { font-family: Helvetica, Arial, sans-serif; font-weight: 700; fill: #102027; }
+      .t { font-family: Helvetica, Arial, sans-serif; fill: #263238; }
+      .small { font-family: Helvetica, Arial, sans-serif; fill: #607d8b; }
+      .note { font-family: Helvetica, Arial, sans-serif; fill: #37474f; }
+      .pin { font-family: Helvetica, Arial, sans-serif; font-weight: 600; }
+      .box { fill: #ffffff; stroke: #263238; stroke-width: 2; }
+      .card { fill: #ffffff; stroke: #90a4ae; stroke-width: 1.5; }
+      .sda { stroke: #1565c0; stroke-width: 3; fill: none; }
+      .scl { stroke: #f9a825; stroke-width: 3; fill: none; }
+      .sig { stroke: #2e7d32; stroke-width: 2.5; fill: none; }
+      .uart { stroke: #6a1b9a; stroke-width: 3; fill: none; }
+      .power { stroke: #d32f2f; stroke-width: 2.5; fill: none; }
+      .gnd { stroke: #263238; stroke-width: 2.5; fill: none; }
+      .dash { stroke: #b0bec5; stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="980" fill="#f5f7fa"/>
+
+  <text class="title" x="40" y="45" font-size="28">VW T3 Dash — подключение датчиков</text>
+  <text class="sub" x="40" y="70" font-size="14">Waveshare ESP32-S3-Touch-LCD-7 · I2C GPIO8/9 · Sensor GPIO6 · UART2 GPIO43/44 · 12V через оптопары</text>
+
+  <!-- Board -->
+  <rect class="box" x="40" y="90" width="420" height="720" rx="14"/>
+  <text class="h" x="60" y="122" font-size="20">Waveshare ESP32-S3-Touch-LCD-7</text>
+  <text class="sub" x="60" y="145" font-size="12">800×480 · GT911 · CH422G · ESP32-S3</text>
+
+  <text class="h" x="60" y="185" font-size="15">I²C header</text>
+  <text class="small" x="60" y="202" font-size="11">общая шина с GT911 и CH422G</text>
+  <text class="t" x="430" y="216" text-anchor="end" font-size="14">3V3</text>
+  <circle cx="450" cy="211" r="6" fill="#d32f2f"/>
+  <text class="t" x="430" y="241" text-anchor="end" font-size="14">GND</text>
+  <circle cx="450" cy="236" r="6" fill="#263238"/>
+  <text class="t" x="430" y="266" text-anchor="end" font-size="14">SDA (GPIO8)</text>
+  <circle cx="450" cy="261" r="6" fill="#1565c0"/>
+  <text class="t" x="430" y="291" text-anchor="end" font-size="14">SCL (GPIO9)</text>
+  <circle cx="450" cy="286" r="6" fill="#f9a825"/>
+
+  <text class="h" x="60" y="345" font-size="15">Sensor header</text>
+  <text class="small" x="60" y="362" font-size="11">ADC 0..3.1V</text>
+  <text class="t" x="430" y="376" text-anchor="end" font-size="14">3V3</text>
+  <circle cx="450" cy="371" r="6" fill="#d32f2f"/>
+  <text class="t" x="430" y="401" text-anchor="end" font-size="14">GND</text>
+  <circle cx="450" cy="396" r="6" fill="#263238"/>
+  <text class="t" x="430" y="426" text-anchor="end" font-size="14">ADC (GPIO6)</text>
+  <circle cx="450" cy="421" r="6" fill="#2e7d32"/>
+
+  <text class="h" x="60" y="480" font-size="15">UART2 header</text>
+  <text class="small" x="60" y="497" font-size="11">переключатель с USB-UART</text>
+  <text class="t" x="430" y="511" text-anchor="end" font-size="14">3V3</text>
+  <circle cx="450" cy="506" r="6" fill="#d32f2f"/>
+  <text class="t" x="430" y="536" text-anchor="end" font-size="14">GND</text>
+  <circle cx="450" cy="531" r="6" fill="#263238"/>
+  <text class="t" x="430" y="561" text-anchor="end" font-size="14">TX (GPIO43)</text>
+  <circle cx="450" cy="556" r="6" fill="#6a1b9a"/>
+  <text class="t" x="430" y="586" text-anchor="end" font-size="14">RX (GPIO44)</text>
+  <circle cx="450" cy="581" r="6" fill="#6a1b9a"/>
+
+  <text class="note" x="60" y="645" font-size="13">I²C уже занята: GT911 (0x5D/0x14) и CH422G (0x20).</text>
+  <text class="note" x="60" y="668" font-size="13">Свободный выведенный GPIO — только GPIO6.</text>
+  <text class="note" x="60" y="691" font-size="13">12V-входы — только через оптопары/делители.</text>
+
+  <!-- ADS1115 -->
+  <rect class="box" x="760" y="90" width="280" height="250" rx="12"/>
+  <text class="h" x="780" y="120" font-size="18">ADS1115</text>
+  <text class="small" x="780" y="139" font-size="12">4 аналоговых входа · 0x48 · gain ±4.096V</text>
+  <text class="pin" x="775" y="155" font-size="12" fill="#d32f2f">VDD</text>
+  <circle cx="760" cy="150" r="5" fill="#d32f2f"/>
+  <text class="pin" x="775" y="180" font-size="12" fill="#263238">GND</text>
+  <circle cx="760" cy="175" r="5" fill="#263238"/>
+  <text class="pin" x="775" y="205" font-size="12" fill="#1565c0">SDA</text>
+  <circle cx="760" cy="200" r="5" fill="#1565c0"/>
+  <text class="pin" x="775" y="230" font-size="12" fill="#f9a825">SCL</text>
+  <circle cx="760" cy="225" r="5" fill="#f9a825"/>
+  <text class="pin" x="775" y="255" font-size="12" fill="#263238">ADDR → GND</text>
+  <circle cx="760" cy="250" r="5" fill="#263238"/>
+
+  <text class="pin" x="1025" y="155" text-anchor="end" font-size="12" fill="#2e7d32">A0</text>
+  <circle cx="1040" cy="150" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="185" text-anchor="end" font-size="12" fill="#2e7d32">A1</text>
+  <circle cx="1040" cy="180" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="215" text-anchor="end" font-size="12" fill="#2e7d32">A2</text>
+  <circle cx="1040" cy="210" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="245" text-anchor="end" font-size="12" fill="#2e7d32">A3</text>
+  <circle cx="1040" cy="240" r="5" fill="#2e7d32"/>
+
+  <!-- MCP23017 -->
+  <rect class="box" x="760" y="400" width="280" height="340" rx="12"/>
+  <text class="h" x="780" y="430" font-size="18">MCP23017</text>
+  <text class="small" x="780" y="449" font-size="12">16 цифровых I/O · 0x21 · polling</text>
+  <text class="pin" x="775" y="465" font-size="12" fill="#d32f2f">VDD</text>
+  <circle cx="760" cy="460" r="5" fill="#d32f2f"/>
+  <text class="pin" x="775" y="490" font-size="12" fill="#263238">GND</text>
+  <circle cx="760" cy="485" r="5" fill="#263238"/>
+  <text class="pin" x="775" y="515" font-size="12" fill="#1565c0">SDA</text>
+  <circle cx="760" cy="510" r="5" fill="#1565c0"/>
+  <text class="pin" x="775" y="540" font-size="12" fill="#f9a825">SCL</text>
+  <circle cx="760" cy="535" r="5" fill="#f9a825"/>
+  <text class="pin" x="775" y="565" font-size="12" fill="#263238">RESET → 3V3</text>
+  <circle cx="760" cy="560" r="5" fill="#263238"/>
+
+  <text class="pin" x="1025" y="455" text-anchor="end" font-size="12" fill="#2e7d32">GPA0</text>
+  <circle cx="1040" cy="450" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="485" text-anchor="end" font-size="12" fill="#2e7d32">GPA1</text>
+  <circle cx="1040" cy="480" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="515" text-anchor="end" font-size="12" fill="#2e7d32">GPA2</text>
+  <circle cx="1040" cy="510" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="545" text-anchor="end" font-size="12" fill="#2e7d32">GPA3</text>
+  <circle cx="1040" cy="540" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="575" text-anchor="end" font-size="12" fill="#2e7d32">GPA4</text>
+  <circle cx="1040" cy="570" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="605" text-anchor="end" font-size="12" fill="#2e7d32">GPA5</text>
+  <circle cx="1040" cy="600" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="635" text-anchor="end" font-size="12" fill="#2e7d32">GPA6</text>
+  <circle cx="1040" cy="630" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="665" text-anchor="end" font-size="12" fill="#2e7d32">GPA7</text>
+  <circle cx="1040" cy="660" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="695" text-anchor="end" font-size="12" fill="#2e7d32">GPB0</text>
+  <circle cx="1040" cy="690" r="5" fill="#2e7d32"/>
+  <text class="small" x="780" y="720" font-size="11">A0=1, A1=0, A2=0 → 0x21</text>
+
+  <!-- Analog sensor cards -->
+  <rect class="card" x="1180" y="90" width="360" height="250" rx="10"/>
+  <text class="h" x="1200" y="120" font-size="17">Аналоговые датчики</text>
+  <text class="t" x="1200" y="155" font-size="13">АКБ: делитель 100k/22k</text>
+  <text class="t" x="1200" y="185" font-size="13">Температура/CHT: 2.2k pull-up</text>
+  <text class="t" x="1200" y="215" font-size="13">Топливо: 150R pull-up</text>
+  <text class="t" x="1200" y="245" font-size="13">3.3V rail → A3 (ratiometric)</text>
+  <text class="small" x="1200" y="285" font-size="11">ADS1115 входы не выше VDD+0.3V</text>
+  <circle cx="1180" cy="150" r="4" fill="#2e7d32"/>
+  <circle cx="1180" cy="180" r="4" fill="#2e7d32"/>
+  <circle cx="1180" cy="210" r="4" fill="#2e7d32"/>
+  <circle cx="1180" cy="240" r="4" fill="#2e7d32"/>
+
+  <line class="sig" x1="1040" y1="150" x2="1180" y2="150"/>
+  <line class="sig" x1="1040" y1="180" x2="1180" y2="180"/>
+  <line class="sig" x1="1040" y1="210" x2="1180" y2="210"/>
+  <line class="sig" x1="1040" y1="240" x2="1180" y2="240"/>
+
+  <!-- Opto bank -->
+  <rect class="card" x="1180" y="400" width="360" height="340" rx="10"/>
+  <text class="h" x="1200" y="430" font-size="17">12V-входы → оптопары</text>
+  <text class="t" x="1200" y="455" font-size="13">масло</text>
+  <text class="t" x="1200" y="485" font-size="13">заряд</text>
+  <text class="t" x="1200" y="515" font-size="13">дальний свет</text>
+  <text class="t" x="1200" y="545" font-size="13">ближний свет</text>
+  <text class="t" x="1200" y="575" font-size="13">поворот L</text>
+  <text class="t" x="1200" y="605" font-size="13">поворот R</text>
+  <text class="t" x="1200" y="635" font-size="13">свечи накала</text>
+  <text class="t" x="1200" y="665" font-size="13">зажигание</text>
+  <text class="t" x="1200" y="695" font-size="13">ручник (опц.)</text>
+  <text class="small" x="1520" y="455" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="485" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="515" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="545" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="575" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="605" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="635" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="665" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="695" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+
+  <line class="sig" x1="1180" y1="450" x2="1040" y2="450"/>
+  <line class="sig" x1="1180" y1="480" x2="1040" y2="480"/>
+  <line class="sig" x1="1180" y1="510" x2="1040" y2="510"/>
+  <line class="sig" x1="1180" y1="540" x2="1040" y2="540"/>
+  <line class="sig" x1="1180" y1="570" x2="1040" y2="570"/>
+  <line class="sig" x1="1180" y1="600" x2="1040" y2="600"/>
+  <line class="sig" x1="1180" y1="630" x2="1040" y2="630"/>
+  <line class="sig" x1="1180" y1="660" x2="1040" y2="660"/>
+  <line class="sig" x1="1180" y1="690" x2="1040" y2="690"/>
+
+  <!-- RPM opto -->
+  <rect class="card" x="520" y="330" width="210" height="150" rx="10"/>
+  <text class="h" x="540" y="353" font-size="16">RPM оптопара</text>
+  <text class="t" x="540" y="377" font-size="12">3V3: 10k pull-up</text>
+  <text class="t" x="540" y="402" font-size="12">GND</text>
+  <text class="t" x="540" y="427" font-size="12">OUT → GPIO6</text>
+  <text class="t" x="540" y="452" font-size="12">IN ← катушка 12V</text>
+  <circle cx="520" cy="371" r="4" fill="#d32f2f"/>
+  <circle cx="520" cy="396" r="4" fill="#263238"/>
+  <circle cx="520" cy="421" r="4" fill="#2e7d32"/>
+  <circle cx="730" cy="446" r="4" fill="#ef6c00"/>
+  <text class="small" x="520" y="500" font-size="10">12V вход: 10k/2W + 1N4007 + 15V zener</text>
+
+  <line class="power" x1="450" y1="371" x2="520" y2="371"/>
+  <line class="gnd" x1="450" y1="396" x2="520" y2="396"/>
+  <line class="sig" x1="450" y1="421" x2="520" y2="421"/>
+
+  <!-- GPS -->
+  <rect class="card" x="760" y="790" width="250" height="120" rx="10"/>
+  <text class="h" x="780" y="817" font-size="16">GPS NEO-6M</text>
+  <text class="small" x="780" y="835" font-size="11">3.3V · 9600 baud</text>
+  <text class="pin" x="775" y="855" font-size="11" fill="#d32f2f">VCC</text>
+  <text class="pin" x="775" y="872" font-size="11" fill="#263238">GND</text>
+  <text class="pin" x="775" y="889" font-size="11" fill="#6a1b9a">TX</text>
+  <text class="pin" x="775" y="906" font-size="11" fill="#6a1b9a">RX</text>
+  <circle cx="760" cy="850" r="4" fill="#d32f2f"/>
+  <circle cx="760" cy="867" r="4" fill="#263238"/>
+  <circle cx="760" cy="884" r="4" fill="#6a1b9a"/>
+  <circle cx="760" cy="901" r="4" fill="#6a1b9a"/>
+
+  <line class="uart" x1="450" y1="556" x2="560" y2="556"/>
+  <line class="uart" x1="560" y1="556" x2="560" y2="884"/>
+  <line class="uart" x1="560" y1="884" x2="760" y2="884"/>
+  <line class="uart" x1="450" y1="581" x2="600" y2="581"/>
+  <line class="uart" x1="600" y1="581" x2="600" y2="901"/>
+  <line class="uart" x1="600" y1="901" x2="760" y2="901"/>
+
+  <!-- I2C bus rails -->
+  <line class="sda" x1="450" y1="261" x2="740" y2="261"/>
+  <line class="sda" x1="740" y1="200" x2="740" y2="510"/>
+  <line class="sda" x1="740" y1="200" x2="760" y2="200"/>
+  <line class="sda" x1="740" y1="510" x2="760" y2="510"/>
+
+  <line class="scl" x1="450" y1="286" x2="750" y2="286"/>
+  <line class="scl" x1="750" y1="225" x2="750" y2="535"/>
+  <line class="scl" x1="750" y1="225" x2="760" y2="225"/>
+  <line class="scl" x1="750" y1="535" x2="760" y2="535"/>
+
+  <!-- Legend / notes -->
+  <rect x="40" y="835" width="460" height="125" rx="10" fill="#ffffff" stroke="#b0bec5" stroke-width="1.5"/>
+  <text class="h" x="60" y="860" font-size="15">Питание и важное</text>
+  <text class="note" x="60" y="884" font-size="12">3.3V/GND — с гребёнок платы на все модули.</text>
+  <text class="note" x="60" y="906" font-size="12">GT911 0x5D/0x14 · CH422G 0x20</text>
+  <text class="note" x="60" y="928" font-size="12">ADS1115 0x48 · MCP23017 0x21</text>
+  <text class="note" x="60" y="950" font-size="12">Только 3.3V на I2C; 12V — через оптопары.</text>
+</svg>
