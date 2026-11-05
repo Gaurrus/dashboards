@@ -84,6 +84,7 @@ int main(int argc, char** argv) {
   const bool viaSdl = argc >= 3 && SDL_strcmp(argv[2], "sdl") == 0;
   const bool bootShot = argc >= 3 && SDL_strcmp(argv[2], "boot") == 0;
   const bool sweepShot = argc >= 3 && SDL_strcmp(argv[2], "sweep") == 0;
+  const bool hotShot = argc >= 3 && SDL_strcmp(argv[2], "hot") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -131,12 +132,16 @@ int main(int argc, char** argv) {
   lv_disp_drv_register(&gDispDrv);
 
   ui::init();
-  if (screenshot && !bootShot && !sweepShot) {
+  if (screenshot && !bootShot && !sweepShot && !hotShot) {
     ui::skipBoot();
   }
   if (sweepShot) {
     ui::update(demo::make(0.0f));
     lv_tick_inc(2300);
+  }
+  if (hotShot) {
+    ui::update(demo::make(0.0f));
+    lv_tick_inc(2750);
   }
 
   float t = 0.0f;

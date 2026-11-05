@@ -45,7 +45,9 @@ constexpr int kMaxTicks = 128;
 lv_point_t g_tickPoints[kMaxTicks][2];
 int g_tickPointCount = 0;
 
-lv_obj_t* g_tempBar = nullptr;
+lv_obj_t* g_tempGradient = nullptr;
+lv_obj_t* g_tempCover = nullptr;
+lv_obj_t* g_tempOutline = nullptr;
 lv_obj_t* g_tempLabel = nullptr;
 lv_obj_t* g_fuelBar = nullptr;
 lv_obj_t* g_fuelLabel = nullptr;
@@ -484,6 +486,48 @@ lv_obj_t* createBar(lv_obj_t* parent, int x, int y, int width, int32_t lo, int32
   return bar;
 }
 
+lv_obj_t* createGradientSegment(lv_obj_t* parent, int x, int width, uint32_t from,
+                                 uint32_t to) {
+  lv_obj_t* segment = lv_obj_create(parent);
+  lv_obj_remove_style_all(segment);
+  lv_obj_set_pos(segment, x, 0);
+  lv_obj_set_size(segment, width, 16);
+  lv_obj_set_style_bg_color(segment, lv_color_hex(from), 0);
+  lv_obj_set_style_bg_grad_color(segment, lv_color_hex(to), 0);
+  lv_obj_set_style_bg_grad_dir(segment, LV_GRAD_DIR_HOR, 0);
+  lv_obj_set_style_bg_opa(segment, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(segment, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(segment, LV_OBJ_FLAG_CLICKABLE);
+  return segment;
+}
+
+void updateTempBar(const Values& v) {
+  char text[32];
+  if (v.coolantValid) {
+    snprintf(text, sizeof(text), "TEMP C %d", (int)(v.coolantC + 0.5f));
+  } else {
+    snprintf(text, sizeof(text), "TEMP C --");
+  }
+  lv_label_set_text(g_tempLabel, text);
+  lv_obj_set_style_text_color(g_tempLabel, lv_color_hex(v.tempWarning ? COL_RED : COL_TEXT),
+                              0);
+
+  float frac = 0.0f;
+  if (v.coolantValid) {
+    frac = (v.coolantC - 40.0f) / 90.0f;
+    if (frac < 0.0f) {
+      frac = 0.0f;
+    }
+    if (frac > 1.0f) {
+      frac = 1.0f;
+    }
+  }
+
+  const int filled = (int)(210.0f * frac);
+  lv_obj_set_pos(g_tempCover, filled, 0);
+  lv_obj_set_size(g_tempCover, 210 - filled, 16);
+}
+
 void updateBar(lv_obj_t* bar, lv_obj_t* label, const char* name, float value,
                bool valid, bool warn, uint32_t color) {
   char text[32];
@@ -523,8 +567,7 @@ void applyValues(const Values& v) {
   updateGauge(g_speed, v.speedKmh, v.speedValid, COL_CYAN);
   updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
 
-  updateBar(g_tempBar, g_tempLabel, "TEMP C", v.coolantC, v.coolantValid, v.tempWarning,
-            COL_GREEN);
+  updateTempBar(v);
   updateBar(g_fuelBar, g_fuelLabel, "FUEL %", v.fuelPct, v.fuelValid, v.fuelWarning,
             COL_YELLOW);
 
@@ -647,7 +690,44 @@ void init() {
 
   g_tempLabel = makeLabel(screen, "TEMP --", &lv_font_montserrat_20, COL_TEXT);
   lv_obj_set_pos(g_tempLabel, 14, 348);
-  g_tempBar = createBar(screen, 14, 376, 210, 40, 130, COL_GREEN);
+
+  g_tempGradient = lv_obj_create(screen);
+  lv_obj_remove_style_all(g_tempGradient);
+  lv_obj_set_pos(g_tempGradient, 14, 376);
+  lv_obj_set_size(g_tempGradient, 210, 16);
+  lv_obj_set_style_radius(g_tempGradient, 8, 0);
+  lv_obj_set_style_clip_corner(g_tempGradient, true, 0);
+  lv_obj_set_style_bg_opa(g_tempGradient, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(g_tempGradient, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_tempGradient, LV_OBJ_FLAG_CLICKABLE);
+
+  // 40..80: blue -> green, 80..100: green -> orange,
+  // 100..115: orange -> red, 115..130: solid red.
+  createGradientSegment(g_tempGradient, 0, 93, COL_BLUE, COL_GREEN);
+  createGradientSegment(g_tempGradient, 93, 47, COL_GREEN, COL_ORANGE);
+  createGradientSegment(g_tempGradient, 140, 35, COL_ORANGE, COL_RED);
+  createGradientSegment(g_tempGradient, 175, 35, COL_RED, COL_RED);
+
+  g_tempCover = lv_obj_create(g_tempGradient);
+  lv_obj_remove_style_all(g_tempCover);
+  lv_obj_set_pos(g_tempCover, 0, 0);
+  lv_obj_set_size(g_tempCover, 210, 16);
+  lv_obj_set_style_radius(g_tempCover, 8, 0);
+  lv_obj_set_style_bg_color(g_tempCover, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(g_tempCover, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(g_tempCover, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_tempCover, LV_OBJ_FLAG_CLICKABLE);
+
+  g_tempOutline = lv_obj_create(screen);
+  lv_obj_remove_style_all(g_tempOutline);
+  lv_obj_set_pos(g_tempOutline, 14, 376);
+  lv_obj_set_size(g_tempOutline, 210, 16);
+  lv_obj_set_style_radius(g_tempOutline, 8, 0);
+  lv_obj_set_style_bg_opa(g_tempOutline, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(g_tempOutline, 1, 0);
+  lv_obj_set_style_border_color(g_tempOutline, lv_color_hex(COL_TRACK), 0);
+  lv_obj_clear_flag(g_tempOutline, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_tempOutline, LV_OBJ_FLAG_CLICKABLE);
 
   g_fuelLabel = makeLabel(screen, "FUEL --", &lv_font_montserrat_20, COL_TEXT);
   lv_obj_set_pos(g_fuelLabel, 576, 348);
