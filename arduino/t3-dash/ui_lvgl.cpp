@@ -108,7 +108,8 @@ void addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rIn
 Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
                   const char* unit, int32_t max, uint32_t accent, float redlineFrac,
                   float tickStep, float labelStep, bool div1000, int arcWidth,
-                  const lv_font_t* valueFont, const lv_font_t* titleFont) {
+                  const lv_font_t* valueFont, const lv_font_t* titleFont,
+                  const lv_font_t* unitFont) {
   lv_obj_t* box = lv_obj_create(parent);
   lv_obj_remove_style_all(box);
   lv_obj_set_size(box, size, size);
@@ -168,7 +169,7 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
 
       char text[16];
       if (div1000) {
-        snprintf(text, sizeof(text), "%.1f", tickValue / 1000.0f);
+        snprintf(text, sizeof(text), "%d", (int)(tickValue / 1000.0f + 0.5f));
       } else {
         snprintf(text, sizeof(text), "%d", (int)(tickValue + 0.5f));
       }
@@ -178,14 +179,18 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
     }
   }
 
-  lv_obj_t* titleLabel = makeLabel(box, title, titleFont, COL_DIM);
-  lv_obj_align(titleLabel, LV_ALIGN_CENTER, 0, -(int)(size * 0.27f));
+  if (title != nullptr && title[0] != '\0') {
+    lv_obj_t* titleLabel = makeLabel(box, title, titleFont, COL_DIM);
+    lv_obj_align(titleLabel, LV_ALIGN_CENTER, 0, -(int)(size * 0.22f));
+  }
 
   lv_obj_t* valueLabel = makeLabel(box, "--", valueFont, accent);
   lv_obj_align(valueLabel, LV_ALIGN_CENTER, 0, 0);
 
-  lv_obj_t* unitLabel = makeLabel(box, unit, &lv_font_montserrat_20, COL_DIM);
-  lv_obj_align(unitLabel, LV_ALIGN_CENTER, 0, (int)(size * 0.17f));
+  if (unit != nullptr && unit[0] != '\0') {
+    lv_obj_t* unitLabel = makeLabel(box, unit, unitFont, COL_DIM);
+    lv_obj_align(unitLabel, LV_ALIGN_CENTER, 0, (int)(size * 0.17f));
+  }
 
   Gauge g;
   g.arc = arc;
@@ -551,13 +556,14 @@ void init() {
   // Left: clock. Center: large speedometer. Right: tachometer.
   createClock(screen, 14, 125, CLOCK_SIZE);
 
-  g_speed = createGauge(screen, 242, 75, SPEED_SIZE, "SPEED", "km/h", 180, COL_CYAN,
+  g_speed = createGauge(screen, 242, 75, SPEED_SIZE, "", "km/h", 180, COL_CYAN,
                         -1.0f, 10.0f, 20.0f, false, 22, &lv_font_montserrat_48,
-                        &lv_font_montserrat_24);
+                        &lv_font_montserrat_24, &lv_font_montserrat_20);
 
-  g_rpm = createGauge(screen, 576, 125, SIDE_SIZE, "RPM x1000", "rpm", 7000, COL_ORANGE,
+  g_rpm = createGauge(screen, 576, 125, SIDE_SIZE, "", "RPM x1000", 7000, COL_ORANGE,
                       5500.0f / 7000.0f, 500.0f, 1000.0f, true, 14,
-                      &lv_font_montserrat_32, &lv_font_montserrat_20);
+                      &lv_font_montserrat_32, &lv_font_montserrat_12,
+                      &lv_font_montserrat_12);
 
   g_voltage = makeLabel(screen, "--.-V", &lv_font_montserrat_32, COL_GREEN);
   lv_obj_align(g_voltage, LV_ALIGN_CENTER, 0, 168);
