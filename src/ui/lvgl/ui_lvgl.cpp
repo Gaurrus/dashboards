@@ -49,7 +49,9 @@ lv_obj_t* g_tempGradient = nullptr;
 lv_obj_t* g_tempCover = nullptr;
 lv_obj_t* g_tempOutline = nullptr;
 lv_obj_t* g_tempLabel = nullptr;
-lv_obj_t* g_fuelBar = nullptr;
+lv_obj_t* g_fuelGradient = nullptr;
+lv_obj_t* g_fuelCover = nullptr;
+lv_obj_t* g_fuelOutline = nullptr;
 lv_obj_t* g_fuelLabel = nullptr;
 lv_obj_t* g_voltage = nullptr;
 lv_obj_t* g_odo = nullptr;
@@ -470,22 +472,6 @@ void setBlinking(lv_obj_t* arrow, bool active, bool blinkOn) {
   }
 }
 
-lv_obj_t* createBar(lv_obj_t* parent, int x, int y, int width, int32_t lo, int32_t hi,
-                    uint32_t color) {
-  lv_obj_t* bar = lv_bar_create(parent);
-  lv_obj_set_size(bar, width, 16);
-  lv_obj_set_pos(bar, x, y);
-  lv_bar_set_range(bar, lo, hi);
-  lv_bar_set_value(bar, lo, LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(bar, lv_color_hex(COL_TRACK), LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
-  lv_obj_set_style_radius(bar, 8, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(bar, lv_color_hex(color), LV_PART_INDICATOR);
-  lv_obj_set_style_radius(bar, 8, LV_PART_INDICATOR);
-  lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
-  return bar;
-}
-
 lv_obj_t* createGradientSegment(lv_obj_t* parent, int x, int width, uint32_t from,
                                  uint32_t to) {
   lv_obj_t* segment = lv_obj_create(parent);
@@ -528,19 +514,31 @@ void updateTempBar(const Values& v) {
   lv_obj_set_size(g_tempCover, 210 - filled, 16);
 }
 
-void updateBar(lv_obj_t* bar, lv_obj_t* label, const char* name, float value,
-               bool valid, bool warn, uint32_t color) {
+void updateFuelBar(const Values& v) {
   char text[32];
-  if (valid) {
-    snprintf(text, sizeof(text), "%s %d", name, (int)(value + 0.5f));
+  if (v.fuelValid) {
+    snprintf(text, sizeof(text), "FUEL %% %d", (int)(v.fuelPct + 0.5f));
   } else {
-    snprintf(text, sizeof(text), "%s --", name);
+    snprintf(text, sizeof(text), "FUEL %% --");
   }
-  lv_label_set_text(label, text);
+  lv_label_set_text(g_fuelLabel, text);
+  lv_obj_set_style_text_color(g_fuelLabel, lv_color_hex(v.fuelWarning ? COL_RED : COL_TEXT),
+                              0);
 
-  lv_bar_set_value(bar, valid ? (int32_t)(value + 0.5f) : 0, LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(bar, lv_color_hex(valid ? (warn ? COL_RED : color) : COL_TRACK),
-                            LV_PART_INDICATOR);
+  float frac = 0.0f;
+  if (v.fuelValid) {
+    frac = v.fuelPct / 100.0f;
+    if (frac < 0.0f) {
+      frac = 0.0f;
+    }
+    if (frac > 1.0f) {
+      frac = 1.0f;
+    }
+  }
+
+  const int filled = (int)(210.0f * frac);
+  lv_obj_set_pos(g_fuelCover, filled, 0);
+  lv_obj_set_size(g_fuelCover, 210 - filled, 16);
 }
 
 void updateClock();
@@ -568,8 +566,7 @@ void applyValues(const Values& v) {
   updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
 
   updateTempBar(v);
-  updateBar(g_fuelBar, g_fuelLabel, "FUEL %", v.fuelPct, v.fuelValid, v.fuelWarning,
-            COL_YELLOW);
+  updateFuelBar(v);
 
   char text[24];
   if (v.batteryValid) {
@@ -731,7 +728,42 @@ void init() {
 
   g_fuelLabel = makeLabel(screen, "FUEL --", &lv_font_montserrat_20, COL_TEXT);
   lv_obj_set_pos(g_fuelLabel, 576, 348);
-  g_fuelBar = createBar(screen, 576, 376, 210, 0, 100, COL_YELLOW);
+
+  g_fuelGradient = lv_obj_create(screen);
+  lv_obj_remove_style_all(g_fuelGradient);
+  lv_obj_set_pos(g_fuelGradient, 576, 376);
+  lv_obj_set_size(g_fuelGradient, 210, 16);
+  lv_obj_set_style_radius(g_fuelGradient, 8, 0);
+  lv_obj_set_style_clip_corner(g_fuelGradient, true, 0);
+  lv_obj_set_style_bg_opa(g_fuelGradient, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(g_fuelGradient, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_fuelGradient, LV_OBJ_FLAG_CLICKABLE);
+
+  // 0..40%: red -> orange, 40..70%: orange -> yellow, 70..100%: yellow -> green.
+  createGradientSegment(g_fuelGradient, 0, 84, COL_RED, COL_ORANGE);
+  createGradientSegment(g_fuelGradient, 84, 63, COL_ORANGE, COL_YELLOW);
+  createGradientSegment(g_fuelGradient, 147, 63, COL_YELLOW, COL_GREEN);
+
+  g_fuelCover = lv_obj_create(g_fuelGradient);
+  lv_obj_remove_style_all(g_fuelCover);
+  lv_obj_set_pos(g_fuelCover, 0, 0);
+  lv_obj_set_size(g_fuelCover, 210, 16);
+  lv_obj_set_style_radius(g_fuelCover, 8, 0);
+  lv_obj_set_style_bg_color(g_fuelCover, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(g_fuelCover, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(g_fuelCover, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_fuelCover, LV_OBJ_FLAG_CLICKABLE);
+
+  g_fuelOutline = lv_obj_create(screen);
+  lv_obj_remove_style_all(g_fuelOutline);
+  lv_obj_set_pos(g_fuelOutline, 576, 376);
+  lv_obj_set_size(g_fuelOutline, 210, 16);
+  lv_obj_set_style_radius(g_fuelOutline, 8, 0);
+  lv_obj_set_style_bg_opa(g_fuelOutline, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(g_fuelOutline, 1, 0);
+  lv_obj_set_style_border_color(g_fuelOutline, lv_color_hex(COL_TRACK), 0);
+  lv_obj_clear_flag(g_fuelOutline, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_fuelOutline, LV_OBJ_FLAG_CLICKABLE);
 
   g_splash = createSplash(screen);
 }
