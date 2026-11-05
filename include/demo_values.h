@@ -11,8 +11,9 @@ inline float wrap(float x, float period) {
   return x - period * floorf(x / period);
 }
 
-inline Values make(float t) {
+inline Values make(float t, bool ignitionOn = true) {
   Values v;
+  v.ignitionOn = ignitionOn;
   v.speedValid = true;
   v.rpmValid = true;
   v.coolantValid = true;

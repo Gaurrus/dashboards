@@ -22,6 +22,7 @@ constexpr int PIN_BUZZER = 33;
 
 // GPIO34..39 are input-only and have no internal pull-ups: add an external 10k to 3.3V.
 constexpr int PIN_RPM_IN = 34;  // PC817 collector, active-low pulse
+constexpr int PIN_IGNITION = 35;  // PC817 collector, active-low, external 10k to 3.3V
 
 constexpr int PIN_OIL     = 25;
 constexpr int PIN_CHARGE  = 26;
