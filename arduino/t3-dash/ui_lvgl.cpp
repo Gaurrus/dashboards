@@ -19,7 +19,10 @@ constexpr uint32_t COL_GREEN = 0x22C55E;
 constexpr uint32_t COL_YELLOW = 0xEAB308;
 constexpr uint32_t COL_BLUE = 0x3B82F6;
 constexpr uint32_t COL_TICK = 0x9CA3AF;
+constexpr uint32_t COL_TURN = 0x2ECC71;
 
+constexpr int ARROW_W = 54;
+constexpr int ARROW_H = 32;
 constexpr int SIDE_SIZE = 210;
 constexpr int SPEED_SIZE = 315;
 constexpr int CLOCK_SIZE = 210;
@@ -50,8 +53,11 @@ lv_obj_t* g_indOil = nullptr;
 lv_obj_t* g_indChg = nullptr;
 lv_obj_t* g_indGlow = nullptr;
 lv_obj_t* g_indBeam = nullptr;
-lv_obj_t* g_indLeft = nullptr;
-lv_obj_t* g_indRight = nullptr;
+
+lv_obj_t* g_turnLeft = nullptr;
+lv_obj_t* g_turnRight = nullptr;
+lv_color_t g_leftArrowBuf[ARROW_W * ARROW_H];
+lv_color_t g_rightArrowBuf[ARROW_W * ARROW_H];
 
 lv_obj_t* g_clockTime = nullptr;
 lv_obj_t* g_clockSeconds = nullptr;
@@ -249,6 +255,38 @@ void setIndicator(lv_obj_t* label, bool on, uint32_t color) {
   lv_obj_set_style_text_color(label, lv_color_hex(on ? color : COL_DIM), 0);
 }
 
+lv_obj_t* createTurnArrow(lv_obj_t* parent, int x, int y, bool left,
+                          lv_color_t* buffer) {
+  static const lv_point_t leftHead[] = {{7, 16}, {47, 2}, {47, 30}};
+  static const lv_point_t rightHead[] = {{46, 16}, {6, 2}, {6, 30}};
+
+  lv_obj_t* canvas = lv_canvas_create(parent);
+  lv_canvas_set_buffer(canvas, buffer, ARROW_W, ARROW_H, LV_IMG_CF_TRUE_COLOR);
+  lv_canvas_fill_bg(canvas, lv_color_hex(COL_BG), LV_OPA_COVER);
+
+  lv_draw_rect_dsc_t dsc;
+  lv_draw_rect_dsc_init(&dsc);
+  dsc.bg_color = lv_color_hex(COL_TURN);
+  dsc.bg_opa = LV_OPA_COVER;
+  dsc.radius = 0;
+  dsc.border_width = 0;
+
+  lv_canvas_draw_polygon(canvas, left ? leftHead : rightHead, 3, &dsc);
+
+  lv_obj_set_pos(canvas, x, y);
+  lv_obj_add_flag(canvas, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
+  return canvas;
+}
+
+void setBlinking(lv_obj_t* arrow, bool active, bool blinkOn) {
+  if (active && blinkOn) {
+    lv_obj_clear_flag(arrow, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(arrow, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
 lv_obj_t* createBar(lv_obj_t* parent, int x, int y, int width, int32_t lo, int32_t hi,
                     uint32_t color) {
   lv_obj_t* bar = lv_bar_create(parent);
@@ -325,10 +363,10 @@ void init() {
   lv_obj_set_pos(g_indGlow, 160, 8);
   g_indBeam = makeLabel(screen, "BEAM", &lv_font_montserrat_20, COL_DIM);
   lv_obj_set_pos(g_indBeam, 250, 8);
-  g_indLeft = makeLabel(screen, "<", &lv_font_montserrat_20, COL_DIM);
-  lv_obj_set_pos(g_indLeft, 340, 8);
-  g_indRight = makeLabel(screen, ">", &lv_font_montserrat_20, COL_DIM);
-  lv_obj_set_pos(g_indRight, 370, 8);
+
+  // Classic VW turn signal arrows, centred on top and blinking.
+  g_turnLeft = createTurnArrow(screen, 338, 2, true, g_leftArrowBuf);
+  g_turnRight = createTurnArrow(screen, 408, 2, false, g_rightArrowBuf);
 
   // Left: clock. Center: large speedometer. Right: tachometer.
   createClock(screen, 14, 125, CLOCK_SIZE);
@@ -385,8 +423,10 @@ void update(const Values& v) {
   setIndicator(g_indChg, v.chargeWarning, COL_RED);
   setIndicator(g_indGlow, v.glowPlug, COL_YELLOW);
   setIndicator(g_indBeam, v.highBeam, COL_BLUE);
-  setIndicator(g_indLeft, v.turnLeft, COL_ORANGE);
-  setIndicator(g_indRight, v.turnRight, COL_ORANGE);
+
+  const bool blinkOn = ((lv_tick_get() / 350U) & 1U) == 0U;
+  setBlinking(g_turnLeft, v.turnLeft, blinkOn);
+  setBlinking(g_turnRight, v.turnRight, blinkOn);
 
   updateClock();
 }
