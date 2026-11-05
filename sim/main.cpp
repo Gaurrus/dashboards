@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 
 #include "demo_values.h"
 #include "lvgl.h"
@@ -12,6 +13,7 @@ namespace {
 
 constexpr int kWidth = 800;
 constexpr int kHeight = 480;
+constexpr uint32_t kFrameMs = 33;  // ~30 FPS, same cadence as the dashboard
 
 SDL_Window* gWindow = nullptr;
 SDL_Renderer* gRenderer = nullptr;
@@ -24,10 +26,81 @@ lv_disp_draw_buf_t gDrawBuf;
 lv_disp_drv_t gDispDrv;
 lv_indev_drv_t gMouseDrv;
 
+lv_obj_t* gPerfPanel = nullptr;
+lv_obj_t* gPerfFpsLabel = nullptr;
+lv_obj_t* gPerfCpuLabel = nullptr;
+lv_obj_t* gPerfMemLabel = nullptr;
+uint32_t gFrameCounter = 0;
+uint32_t gPerfLastMs = 0;
+clock_t gPerfLastCpu = 0;
+
 int gMouseX = 0;
 int gMouseY = 0;
 bool gMouseDown = false;
 bool gIgnitionOn = true;
+
+void perfUpdateCb(lv_timer_t* /*timer*/) {
+  const uint32_t now = SDL_GetTicks();
+  const uint32_t elapsed = now - gPerfLastMs;
+  if (elapsed < 100) {
+    return;
+  }
+
+  const float seconds = (float)elapsed / 1000.0f;
+  const uint32_t fps = (uint32_t)((float)gFrameCounter / seconds + 0.5f);
+  gFrameCounter = 0;
+  gPerfLastMs = now;
+
+  const clock_t cpuNow = clock();
+  const float cpu =
+      (float)(cpuNow - gPerfLastCpu) / (float)CLOCKS_PER_SEC / seconds * 100.0f;
+  gPerfLastCpu = cpuNow;
+
+  lv_mem_monitor_t mon;
+  lv_mem_monitor(&mon);
+  const uint32_t usedKb = (mon.total_size - mon.free_size) / 1024U;
+
+  char text[48];
+  snprintf(text, sizeof(text), "FPS: %u", (unsigned)fps);
+  lv_label_set_text(gPerfFpsLabel, text);
+  snprintf(text, sizeof(text), "CPU: %u%% host", (unsigned)(cpu + 0.5f));
+  lv_label_set_text(gPerfCpuLabel, text);
+  snprintf(text, sizeof(text), "RAM: %u%% (%u KB)", (unsigned)mon.used_pct,
+           (unsigned)usedKb);
+  lv_label_set_text(gPerfMemLabel, text);
+}
+
+void createPerfOverlay() {
+  gPerfPanel = lv_obj_create(lv_layer_sys());
+  lv_obj_remove_style_all(gPerfPanel);
+  lv_obj_set_size(gPerfPanel, 195, 78);
+  lv_obj_align(gPerfPanel, LV_ALIGN_BOTTOM_LEFT, 8, -8);
+  lv_obj_set_style_bg_color(gPerfPanel, lv_color_hex(0x11161B), 0);
+  lv_obj_set_style_bg_opa(gPerfPanel, (lv_opa_t)215, 0);
+  lv_obj_set_style_border_width(gPerfPanel, 1, 0);
+  lv_obj_set_style_border_color(gPerfPanel, lv_color_hex(0x2A2F35), 0);
+  lv_obj_set_style_radius(gPerfPanel, 6, 0);
+  lv_obj_clear_flag(gPerfPanel, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(gPerfPanel, LV_OBJ_FLAG_CLICKABLE);
+
+  auto make = [&](int y) {
+    lv_obj_t* label = lv_label_create(gPerfPanel);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(0xE6E6E6), 0);
+    lv_obj_set_pos(label, 10, y);
+    return label;
+  };
+  gPerfFpsLabel = make(8);
+  gPerfCpuLabel = make(28);
+  gPerfMemLabel = make(48);
+  lv_label_set_text(gPerfFpsLabel, "FPS: --");
+  lv_label_set_text(gPerfCpuLabel, "CPU: --");
+  lv_label_set_text(gPerfMemLabel, "RAM: --");
+
+  gPerfLastMs = SDL_GetTicks();
+  gPerfLastCpu = clock();
+  lv_timer_create(perfUpdateCb, 500, nullptr);
+}
 
 void mouseReadCb(lv_indev_drv_t* /*drv*/, lv_indev_data_t* data) {
   data->point.x = gMouseX;
@@ -90,14 +163,27 @@ void present() {
   SDL_RenderPresent(gRenderer);
 }
 
-void flushCb(lv_disp_drv_t* drv, const lv_area_t* area, lv_color_t* color_p) {
-  SDL_Rect rect;
-  rect.x = area->x1;
-  rect.y = area->y1;
-  rect.w = area->x2 - area->x1 + 1;
-  rect.h = area->y2 - area->y1 + 1;
+uint32_t toArgb(lv_color_t color) {
+  return lv_color_to32(color);
+}
 
-  SDL_UpdateTexture(gTexture, &rect, color_p, kWidth * (int)sizeof(lv_color_t));
+void flushCb(lv_disp_drv_t* drv, const lv_area_t* area, lv_color_t* color_p) {
+  static uint32_t row[kWidth];
+
+  const int w = area->x2 - area->x1 + 1;
+  for (int y = area->y1; y <= area->y2; ++y) {
+    for (int x = 0; x < w; ++x) {
+      row[x] = toArgb(color_p[x]);
+    }
+    SDL_Rect rect;
+    rect.x = area->x1;
+    rect.y = y;
+    rect.w = w;
+    rect.h = 1;
+    SDL_UpdateTexture(gTexture, &rect, row, w * (int)sizeof(uint32_t));
+    color_p += w;
+  }
+
   gDirty = true;
   lv_disp_flush_ready(drv);
 }
@@ -135,7 +221,15 @@ void saveBmp(const char* path) {
     return;
   }
   fwrite(header, 1, sizeof(header), file);
-  fwrite(gFramebuffer, 1, (size_t)imageSize, file);
+
+  static uint32_t row[kWidth];
+  for (int y = 0; y < kHeight; ++y) {
+    const lv_color_t* src = &gFramebuffer[y * kWidth];
+    for (int x = 0; x < kWidth; ++x) {
+      row[x] = toArgb(src[x]);
+    }
+    fwrite(row, 1, (size_t)rowBytes, file);
+  }
   fclose(file);
 }
 
@@ -156,6 +250,7 @@ int main(int argc, char** argv) {
   const bool byeShot = argc >= 3 && SDL_strcmp(argv[2], "bye") == 0;
   const bool clockShot = argc >= 3 && SDL_strcmp(argv[2], "clock") == 0;
   const bool clocksetShot = argc >= 3 && SDL_strcmp(argv[2], "clockset") == 0;
+  const bool perfShot = argc >= 3 && SDL_strcmp(argv[2], "perf") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -208,9 +303,30 @@ int main(int argc, char** argv) {
   lv_indev_drv_register(&gMouseDrv);
 
   ui::init();
+  createPerfOverlay();
+  if (screenshot && !perfShot) {
+    lv_obj_add_flag(lv_layer_sys(), LV_OBJ_FLAG_HIDDEN);
+  }
   if (screenshot && !bootShot && !sweepShot && !hotShot && !videoShot &&
-      !videoBrightShot && !videoAllShot) {
+      !videoBrightShot && !videoAllShot && !perfShot) {
     ui::skipBoot();
+  }
+  if (perfShot) {
+    ui::skipBoot();
+    float pt = 0.0f;
+    for (int i = 0; i < 60; ++i) {
+      const uint32_t frameStart = SDL_GetTicks();
+      ui::update(demo::make(pt));
+      lv_tick_inc(33);
+      lv_timer_handler();
+      lv_refr_now(lv_disp_get_default());
+      ++gFrameCounter;
+      pt += 0.033f;
+      const uint32_t frameTime = SDL_GetTicks() - frameStart;
+      if (frameTime < kFrameMs) {
+        SDL_Delay(kFrameMs - frameTime);
+      }
+    }
   }
   if (sweepShot) {
     ui::update(demo::make(0.0f));
@@ -325,10 +441,13 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  printf("VW T3 dashboard simulator running. Esc exits, I toggles ignition.\n");
+  printf("VW T3 dashboard simulator (ESP32-S3 emulation: 16-bit color, 6 MB LVGL heap, 30 FPS).\n");
+  printf("Esc exits, I toggles ignition, P toggles FPS/CPU/RAM overlay.\n");
   fflush(stdout);
 
   while (true) {
+    const uint32_t frameStart = SDL_GetTicks();
+
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_QUIT) {
@@ -339,6 +458,13 @@ int main(int argc, char** argv) {
       }
       if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_i) {
         gIgnitionOn = !gIgnitionOn;
+      }
+      if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_p) {
+        if (lv_obj_has_flag(lv_layer_sys(), LV_OBJ_FLAG_HIDDEN)) {
+          lv_obj_clear_flag(lv_layer_sys(), LV_OBJ_FLAG_HIDDEN);
+        } else {
+          lv_obj_add_flag(lv_layer_sys(), LV_OBJ_FLAG_HIDDEN);
+        }
       }
       if (event.type == SDL_MOUSEMOTION) {
         gMouseX = event.motion.x;
@@ -366,10 +492,14 @@ int main(int argc, char** argv) {
     if (gDirty) {
       present();
       gDirty = false;
+      ++gFrameCounter;
     }
 
-    SDL_Delay(5);
-    t += 0.016f;
+    t += 0.033f;
+    const uint32_t frameTime = SDL_GetTicks() - frameStart;
+    if (frameTime < kFrameMs) {
+      SDL_Delay(kFrameMs - frameTime);
+    }
   }
 
   return 0;
