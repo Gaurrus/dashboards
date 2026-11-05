@@ -6,3 +6,4 @@ sim/third_party/lvgl/
 dist/
 waveshare/.pio/
 HANDOFF.md
+sim/preview.mp4

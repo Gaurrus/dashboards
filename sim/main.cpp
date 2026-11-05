@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 
 #include "demo_values.h"
 #include "lvgl.h"
@@ -86,6 +87,7 @@ int main(int argc, char** argv) {
   const bool sweepShot = argc >= 3 && SDL_strcmp(argv[2], "sweep") == 0;
   const bool hotShot = argc >= 3 && SDL_strcmp(argv[2], "hot") == 0;
   const bool lowShot = argc >= 3 && SDL_strcmp(argv[2], "low") == 0;
+  const bool videoShot = argc >= 3 && SDL_strcmp(argv[2], "video") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -133,7 +135,7 @@ int main(int argc, char** argv) {
   lv_disp_drv_register(&gDispDrv);
 
   ui::init();
-  if (screenshot && !bootShot && !sweepShot && !hotShot) {
+  if (screenshot && !bootShot && !sweepShot && !hotShot && !videoShot) {
     ui::skipBoot();
   }
   if (sweepShot) {
@@ -143,6 +145,23 @@ int main(int argc, char** argv) {
   if (hotShot) {
     ui::update(demo::make(0.0f));
     lv_tick_inc(2750);
+  }
+
+  if (videoShot) {
+    // Usage: t3dash_sim <output_dir> video [seconds] [fps]
+    const float seconds = argc >= 4 ? (float)atof(argv[3]) : 10.0f;
+    const int fps = argc >= 5 ? atoi(argv[4]) : 30;
+    const int frameCount = (int)(seconds * fps + 0.5f);
+    for (int i = 0; i < frameCount; ++i) {
+      ui::update(demo::make((float)i / (float)fps));
+      lv_tick_inc(1000 / fps);
+      lv_timer_handler();
+      lv_refr_now(lv_disp_get_default());
+      char path[512];
+      snprintf(path, sizeof(path), "%s/frame_%04d.bmp", argv[1], i);
+      saveBmp(path);
+    }
+    return 0;
   }
 
   float t = lowShot ? 6.0f : 0.0f;
