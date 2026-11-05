@@ -22,6 +22,33 @@ bool gDirty = false;
 lv_color_t gFramebuffer[kWidth * kHeight];
 lv_disp_draw_buf_t gDrawBuf;
 lv_disp_drv_t gDispDrv;
+lv_indev_drv_t gMouseDrv;
+
+int gMouseX = 0;
+int gMouseY = 0;
+bool gMouseDown = false;
+
+void mouseReadCb(lv_indev_drv_t* /*drv*/, lv_indev_data_t* data) {
+  data->point.x = gMouseX;
+  data->point.y = gMouseY;
+  data->state = gMouseDown ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+
+// Drives a scripted brightness swipe for the preview video:
+// 7.0-8.2 s swipe down, 10.0-11.2 s swipe up.
+void updateBrightnessDemoMouse(float t) {
+  gMouseX = 760;
+  if (t >= 7.0f && t < 8.2f) {
+    gMouseDown = true;
+    gMouseY = 120 + (int)((t - 7.0f) / 1.2f * 240.0f);
+  } else if (t >= 10.0f && t < 11.2f) {
+    gMouseDown = true;
+    gMouseY = 360 - (int)((t - 10.0f) / 1.2f * 180.0f);
+  } else {
+    gMouseDown = false;
+    gMouseY = 360;
+  }
+}
 
 void present() {
   SDL_RenderClear(gRenderer);
@@ -88,6 +115,9 @@ int main(int argc, char** argv) {
   const bool hotShot = argc >= 3 && SDL_strcmp(argv[2], "hot") == 0;
   const bool lowShot = argc >= 3 && SDL_strcmp(argv[2], "low") == 0;
   const bool videoShot = argc >= 3 && SDL_strcmp(argv[2], "video") == 0;
+  const bool videoBrightShot = argc >= 3 && SDL_strcmp(argv[2], "video_bright") == 0;
+  const bool dimShot = argc >= 3 && SDL_strcmp(argv[2], "dim") == 0;
+  const bool swipeShot = argc >= 3 && SDL_strcmp(argv[2], "swipe") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -134,8 +164,14 @@ int main(int argc, char** argv) {
   gDispDrv.full_refresh = 1;
   lv_disp_drv_register(&gDispDrv);
 
+  lv_indev_drv_init(&gMouseDrv);
+  gMouseDrv.type = LV_INDEV_TYPE_POINTER;
+  gMouseDrv.read_cb = mouseReadCb;
+  lv_indev_drv_register(&gMouseDrv);
+
   ui::init();
-  if (screenshot && !bootShot && !sweepShot && !hotShot && !videoShot) {
+  if (screenshot && !bootShot && !sweepShot && !hotShot && !videoShot &&
+      !videoBrightShot) {
     ui::skipBoot();
   }
   if (sweepShot) {
@@ -146,14 +182,35 @@ int main(int argc, char** argv) {
     ui::update(demo::make(0.0f));
     lv_tick_inc(2750);
   }
+  if (dimShot) {
+    ui::setBrightness(40);
+  }
+  if (swipeShot) {
+    // Synthetic swipe down along the right edge lowers the brightness.
+    gMouseX = 760;
+    gMouseY = 120;
+    gMouseDown = true;
+    for (int i = 0; i <= 10; ++i) {
+      gMouseY = 120 + i * 20;
+      lv_tick_inc(16);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    lv_tick_inc(16);
+    lv_timer_handler();
+  }
 
-  if (videoShot) {
-    // Usage: t3dash_sim <output_dir> video [seconds] [fps]
+  if (videoShot || videoBrightShot) {
+    // Usage: t3dash_sim <output_dir> video|video_bright [seconds] [fps]
     const float seconds = argc >= 4 ? (float)atof(argv[3]) : 10.0f;
     const int fps = argc >= 5 ? atoi(argv[4]) : 30;
     const int frameCount = (int)(seconds * fps + 0.5f);
     for (int i = 0; i < frameCount; ++i) {
-      ui::update(demo::make((float)i / (float)fps));
+      const float ft = (float)i / (float)fps;
+      if (videoBrightShot) {
+        updateBrightnessDemoMouse(ft);
+      }
+      ui::update(demo::make(ft));
       lv_tick_inc(1000 / fps);
       lv_timer_handler();
       lv_refr_now(lv_disp_get_default());
@@ -208,6 +265,20 @@ int main(int argc, char** argv) {
       }
       if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
         return 0;
+      }
+      if (event.type == SDL_MOUSEMOTION) {
+        gMouseX = event.motion.x;
+        gMouseY = event.motion.y;
+      }
+      if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        gMouseDown = true;
+        gMouseX = event.button.x;
+        gMouseY = event.button.y;
+      }
+      if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
+        gMouseDown = false;
+        gMouseX = event.button.x;
+        gMouseY = event.button.y;
       }
     }
 
