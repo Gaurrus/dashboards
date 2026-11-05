@@ -26,8 +26,8 @@
 
   <rect x="0" y="0" width="1600" height="980" fill="#f5f7fa"/>
 
-  <text class="title" x="40" y="45" font-size="28">VW T3 Dash — подключение датчиков</text>
-  <text class="sub" x="40" y="70" font-size="14">Waveshare ESP32-S3-Touch-LCD-7 · I2C GPIO8/9 · Sensor GPIO6 · UART2 GPIO43/44 · 12V через оптопары</text>
+  <text class="title" x="40" y="45" font-size="28">VW T3 Dash — подключение датчиков (1.6 diesel)</text>
+  <text class="sub" x="40" y="70" font-size="14">Waveshare ESP32-S3-Touch-LCD-7 · I2C GPIO8/9 · ABS speed GPIO6 · RPM с W-терминала генератора · UART2 GPS</text>
 
   <!-- Board -->
   <rect class="box" x="40" y="90" width="420" height="720" rx="14"/>
@@ -46,7 +46,7 @@
   <circle cx="450" cy="286" r="6" fill="#f9a825"/>
 
   <text class="h" x="60" y="345" font-size="15">Sensor header</text>
-  <text class="small" x="60" y="362" font-size="11">ADC 0..3.1V</text>
+  <text class="small" x="60" y="362" font-size="11">GPIO6: ABS speed / ADC 0..3.1V</text>
   <text class="t" x="430" y="376" text-anchor="end" font-size="14">3V3</text>
   <circle cx="450" cy="371" r="6" fill="#d32f2f"/>
   <text class="t" x="430" y="401" text-anchor="end" font-size="14">GND</text>
@@ -66,7 +66,7 @@
   <circle cx="450" cy="581" r="6" fill="#6a1b9a"/>
 
   <text class="note" x="60" y="645" font-size="13">I²C уже занята: GT911 (0x5D/0x14) и CH422G (0x20).</text>
-  <text class="note" x="60" y="668" font-size="13">Свободный выведенный GPIO — только GPIO6.</text>
+  <text class="note" x="60" y="668" font-size="13">Свободный выведенный GPIO — GPIO6 (импульсы ABS).</text>
   <text class="note" x="60" y="691" font-size="13">12V-входы — только через оптопары/делители.</text>
 
   <!-- ADS1115 -->
@@ -126,16 +126,19 @@
   <circle cx="1040" cy="660" r="5" fill="#2e7d32"/>
   <text class="pin" x="1025" y="695" text-anchor="end" font-size="12" fill="#2e7d32">GPB0</text>
   <circle cx="1040" cy="690" r="5" fill="#2e7d32"/>
+  <text class="pin" x="1025" y="725" text-anchor="end" font-size="12" fill="#2e7d32">GPB1</text>
+  <circle cx="1040" cy="720" r="5" fill="#2e7d32"/>
   <text class="small" x="780" y="720" font-size="11">A0=1, A1=0, A2=0 → 0x21</text>
 
   <!-- Analog sensor cards -->
   <rect class="card" x="1180" y="90" width="360" height="250" rx="10"/>
-  <text class="h" x="1200" y="120" font-size="17">Аналоговые датчики</text>
+  <text class="h" x="1200" y="120" font-size="17">Аналоговые входы</text>
   <text class="t" x="1200" y="155" font-size="13">АКБ: делитель 100k/22k</text>
   <text class="t" x="1200" y="185" font-size="13">Температура/CHT: 2.2k pull-up</text>
   <text class="t" x="1200" y="215" font-size="13">Топливо: 150R pull-up</text>
-  <text class="t" x="1200" y="245" font-size="13">3.3V rail → A3 (ratiometric)</text>
-  <text class="small" x="1200" y="285" font-size="11">ADS1115 входы не выше VDD+0.3V</text>
+  <text class="t" x="1200" y="245" font-size="13">RPM: W-терминал → LM2917 → A3</text>
+  <text class="small" x="1200" y="270" font-size="11">дизель 1.6 D/TD: W-терминал генератора</text>
+  <text class="small" x="1200" y="290" font-size="11">ADS1115 входы не выше VDD+0.3V</text>
   <circle cx="1180" cy="150" r="4" fill="#2e7d32"/>
   <circle cx="1180" cy="180" r="4" fill="#2e7d32"/>
   <circle cx="1180" cy="210" r="4" fill="#2e7d32"/>
@@ -158,6 +161,7 @@
   <text class="t" x="1200" y="635" font-size="13">свечи накала</text>
   <text class="t" x="1200" y="665" font-size="13">зажигание</text>
   <text class="t" x="1200" y="695" font-size="13">ручник (опц.)</text>
+  <text class="t" x="1200" y="725" font-size="13">масло 1.8 бар (1.6 TD)</text>
   <text class="small" x="1520" y="455" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
   <text class="small" x="1520" y="485" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
   <text class="small" x="1520" y="515" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
@@ -167,6 +171,7 @@
   <text class="small" x="1520" y="635" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
   <text class="small" x="1520" y="665" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
   <text class="small" x="1520" y="695" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
+  <text class="small" x="1520" y="725" text-anchor="end" font-size="11" fill="#ef6c00">12V</text>
 
   <line class="sig" x1="1180" y1="450" x2="1040" y2="450"/>
   <line class="sig" x1="1180" y1="480" x2="1040" y2="480"/>
@@ -177,19 +182,20 @@
   <line class="sig" x1="1180" y1="630" x2="1040" y2="630"/>
   <line class="sig" x1="1180" y1="660" x2="1040" y2="660"/>
   <line class="sig" x1="1180" y1="690" x2="1040" y2="690"/>
+  <line class="sig" x1="1180" y1="720" x2="1040" y2="720"/>
 
-  <!-- RPM opto -->
+  <!-- ABS conditioner -->
   <rect class="card" x="520" y="330" width="210" height="150" rx="10"/>
-  <text class="h" x="540" y="353" font-size="16">RPM оптопара</text>
-  <text class="t" x="540" y="377" font-size="12">3V3: 10k pull-up</text>
+  <text class="h" x="540" y="353" font-size="16">ABS conditioner</text>
+  <text class="t" x="540" y="377" font-size="12">3V3</text>
   <text class="t" x="540" y="402" font-size="12">GND</text>
   <text class="t" x="540" y="427" font-size="12">OUT → GPIO6</text>
-  <text class="t" x="540" y="452" font-size="12">IN ← катушка 12V</text>
+  <text class="t" x="540" y="452" font-size="12">IN ← ABS sensor</text>
   <circle cx="520" cy="371" r="4" fill="#d32f2f"/>
   <circle cx="520" cy="396" r="4" fill="#263238"/>
   <circle cx="520" cy="421" r="4" fill="#2e7d32"/>
   <circle cx="730" cy="446" r="4" fill="#ef6c00"/>
-  <text class="small" x="520" y="500" font-size="10">12V вход: 10k/2W + 1N4007 + 15V zener</text>
+  <text class="small" x="520" y="500" font-size="10">LM393 с гистерезисом / LM1815; 3.3V square</text>
 
   <line class="power" x1="450" y1="371" x2="520" y2="371"/>
   <line class="gnd" x1="450" y1="396" x2="520" y2="396"/>
@@ -230,7 +236,7 @@
   <rect x="40" y="835" width="460" height="125" rx="10" fill="#ffffff" stroke="#b0bec5" stroke-width="1.5"/>
   <text class="h" x="60" y="860" font-size="15">Питание и важное</text>
   <text class="note" x="60" y="884" font-size="12">3.3V/GND — с гребёнок платы на все модули.</text>
-  <text class="note" x="60" y="906" font-size="12">GT911 0x5D/0x14 · CH422G 0x20</text>
-  <text class="note" x="60" y="928" font-size="12">ADS1115 0x48 · MCP23017 0x21</text>
-  <text class="note" x="60" y="950" font-size="12">Только 3.3V на I2C; 12V — через оптопары.</text>
+  <text class="note" x="60" y="906" font-size="12">GT911 0x5D/0x14 · CH422G 0x20 · ADS1115 0x48 · MCP23017 0x21</text>
+  <text class="note" x="60" y="928" font-size="12">1.6 D/TD: RPM с W-терминала генератора.</text>
+  <text class="note" x="60" y="950" font-size="12">Скорость — ABS → GPIO6; красная зона ~4500–4800.</text>
 </svg>

@@ -2,7 +2,7 @@
   "version": 1,
   "author": "T3 Dash",
   "editor": "manual",
-  "description": "Подключение датчиков VW T3 к Waveshare ESP32-S3-Touch-LCD-7 через I2C, GPIO6, UART2 и оптопары. Это документация, а не Wokwi-симуляция.",
+  "description": "Подключение датчиков VW T3 с дизелем 1.6 D/TD (CS/JX) к Waveshare ESP32-S3-Touch-LCD-7: I2C, GPIO6 (ABS), UART2, оптопары. Скорость — с ABS-гребёнки. Это документация, а не Wokwi-симуляция.",
   "board": {
     "name": "Waveshare ESP32-S3-Touch-LCD-7",
     "mcu": "ESP32-S3",
@@ -80,12 +80,21 @@
       }
     },
     {
-      "id": "rpmOpto",
-      "type": "optocoupler",
+      "id": "rpmFv",
+      "type": "lm2917-frequency-to-voltage",
       "attrs": {
-        "input": "импульсы катушки зажигания, 12V через 10k/2W + 1N4007 + 15V zener",
-        "output": "open collector -> GPIO6",
-        "note": "10k pull-up GPIO6 -> 3.3V"
+        "input": "W-терминал генератора (AC, дизель 1.6 D/TD)",
+        "output": "0..3.3V -> ADS1115 A3",
+        "note": "перед входом делитель/защита; калибровка по передаточному отношению шкивов"
+      }
+    },
+    {
+      "id": "absCond",
+      "type": "abs-signal-conditioner",
+      "attrs": {
+        "input": "индуктивный датчик ABS (2 провода, гребёнка)",
+        "output": "квадратный сигнал 3.3V -> GPIO6 (PCNT)",
+        "note": "LM393 с гистерезисом или LM1815; если ABS ECU даёт готовый square-wave — оптопара"
       }
     },
     {
@@ -117,7 +126,10 @@
     ["ads:A0", "batDiv:OUT", "green", ["battery voltage"]],
     ["ads:A1", "coolant:SIG", "green", ["coolant/CHT"]],
     ["ads:A2", "fuel:SIG", "green", ["fuel level"]],
-    ["ads:A3", "board:I2C_3V3", "green", ["excitation reference"]],
+    ["ads:A3", "rpmFv:OUT", "green", ["RPM: W-терминал -> LM2917 -> A3"]],
+    ["board:I2C_3V3", "rpmFv:VDD", "red", []],
+    ["board:I2C_GND", "rpmFv:GND", "black", []],
+    ["rpmFv:IN", "signal:alternatorW", "orange", ["AC с W-терминала генератора"]],
 
     ["opto:OUT1", "mcp:GPA0", "green", ["oil pressure warning"]],
     ["opto:OUT2", "mcp:GPA1", "green", ["charge warning"]],
@@ -128,6 +140,7 @@
     ["opto:OUT7", "mcp:GPA6", "green", ["glow plug"]],
     ["opto:OUT8", "mcp:GPA7", "green", ["ignition on"]],
     ["opto:OUT9", "mcp:GPB0", "green", ["parking brake (optional)"]],
+    ["opto:OUT10", "mcp:GPB1", "green", ["oil pressure 1.8 bar (optional, 1.6 TD)"]],
 
     ["opto:BOARD_GND", "board:I2C_GND", "black", ["output side"]],
     ["opto:CAR_GND", "car:GND", "black", ["input side; isolated from board GND"]],
@@ -140,12 +153,13 @@
     ["opto:IN7", "signal:glowPlug", "orange", ["12V active-high"]],
     ["opto:IN8", "signal:ignition", "orange", ["12V active-high"]],
     ["opto:IN9", "signal:parkingBrake", "orange", ["12V active-high, optional"]],
+    ["opto:IN10", "signal:oilHigh", "orange", ["12V active-high, optional 1.8 bar"]],
 
-    ["board:SENSOR_3V3", "rpmOpto:PULLUP", "red", ["10k to GPIO6"]],
-    ["rpmOpto:OUT", "board:SENSOR_ADC", "green", ["GPIO6, digital input"]],
-    ["rpmOpto:GND", "board:SENSOR_GND", "black", ["output side"]],
-    ["rpmOpto:IN", "signal:coilNegative", "orange", ["12V pulses"]],
-    ["rpmOpto:CAR_GND", "car:GND", "black", ["input side"]],
+    ["board:I2C_3V3", "absCond:VDD", "red", ["conditioner supply"]],
+    ["board:I2C_GND", "absCond:GND", "black", ["common ground"]],
+    ["absCond:OUT", "board:SENSOR_ADC", "green", ["GPIO6: ABS speed pulses (PCNT)"]],
+    ["absCond:IN", "signal:absSensor+", "orange", ["inductive ABS sensor"]],
+    ["absCond:GND", "signal:absSensor-", "black", ["sensor return / car ground"]],
 
     ["board:UART2_3V3", "gps:VCC", "red", ["3.3V module only"]],
     ["board:UART2_GND", "gps:GND", "black", []],
@@ -159,9 +173,9 @@
     { "name": "batteryV", "source": "АКБ 12..15V", "input": "ADS1115 A0", "note": "делитель 100k/22k" },
     { "name": "coolantC", "source": "датчик температуры/CHT", "input": "ADS1115 A1", "note": "2.2k pull-up" },
     { "name": "fuelPct", "source": "датчик уровня топлива", "input": "ADS1115 A2", "note": "150R pull-up" },
-    { "name": "excitation", "source": "3.3V rail", "input": "ADS1115 A3", "note": "ratiometric reference" },
-    { "name": "rpm", "source": "катушка зажигания", "input": "GPIO6", "note": "оптопара + 10k pull-up" },
-    { "name": "gps", "source": "NEO-6M", "input": "UART2 GPIO43/44", "note": "9600 baud" },
+    { "name": "rpm", "source": "W-терминал генератора (1.6 D/TD)", "input": "ADS1115 A3 через LM2917", "note": "F/V; калибровка по шкивам" },
+    { "name": "vehicleSpeed", "source": "ABS-датчик/гребёнка", "input": "GPIO6 (PCNT)", "note": "калибровка по числу зубьев и окружности колеса" },
+    { "name": "gps", "source": "NEO-6M (опционально)", "input": "UART2 GPIO43/44", "note": "время/одометр, не скорость" },
     { "name": "oilWarning", "source": "12V лампа масла", "input": "MCP23017 GPA0", "note": "active-low после оптопары" },
     { "name": "chargeWarning", "source": "12V лампа заряда", "input": "MCP23017 GPA1", "note": "active-low" },
     { "name": "highBeam", "source": "12V дальний свет", "input": "MCP23017 GPA2", "note": "active-low" },
@@ -169,7 +183,8 @@
     { "name": "turnLeft", "source": "12V поворотник L", "input": "MCP23017 GPA4", "note": "active-low" },
     { "name": "turnRight", "source": "12V поворотник R", "input": "MCP23017 GPA5", "note": "active-low" },
     { "name": "glowPlug", "source": "12V свечи накала", "input": "MCP23017 GPA6", "note": "active-low" },
-    { "name": "ignition", "source": "12V зажигание", "input": "MCP23017 GPA7", "note": "active-low" },
+    { "name": "ignition", "source": "12V клемма 15 (зажигание)", "input": "MCP23017 GPA7", "note": "active-low" },
+    { "name": "oilHigh", "source": "12V 1.8 бар (1.6 TD)", "input": "MCP23017 GPB1", "note": "опционально" },
     { "name": "parkingBrake", "source": "12V ручник", "input": "MCP23017 GPB0", "note": "опционально" }
   ],
   "notes": [
@@ -177,11 +192,17 @@
     "GT911: 0x5D/0x14, CH422G: 0x20 (по конфигу платы). ADS1115: 0x48, MCP23017: 0x21.",
     "Все I2C-модули питать только от 3.3V. На плате уже есть pull-up 4.7k; лишние pull-up на модулях лучше снять.",
     "12V-входы заводить только через оптопары/делители. Общий провод платы и автомобиля — по схеме питания.",
-    "GPIO6: 0..3.1V ADC. Для RPM использовать как цифровой вход с внешним 10k pull-up к 3.3V.",
+    "GPIO6: 0..3.1V ADC. Используется как вход импульсов скорости с ABS (PCNT), не для RPM.",
     "UART2 (GPIO43/44) делит порт с USB-UART через переключатель: GPS и отладочный Serial одновременно не использовать.",
     "GPIO15/16 заняты RS485-трансивером, GPIO19/20 — CAN/USB, GPIO11/12/13 — TF-слотом.",
     "GPIO35 в прототипном hal_real.cpp — это ESP32 DevKit; на Waveshare GPIO33..37 заняты OPI PSRAM.",
     "ADS1115 gain: GAIN_ONE (±4.096V) для делителя АКБ; входы не должны превышать VDD+0.3V.",
+    "Дизель 1.6 D/TD: катушки зажигания нет. RPM берётся с W-терминала генератора; перед LM2917 нужен делитель/защита от 12V AC.",
+    "ABS: если датчик индуктивный — LM393/LM1815; если с ABS ECU идёт готовый квадратный сигнал — оптопара/делитель.",
+    "Скорость с ABS калибровать по числу зубьев гребёнки и реальной окружности колеса; направление и пропуски зубьев проверить.",
+    "Тахометр 1.6 diesel: рабочая зона до ~4500, красная ~4500–4800, отсечка ~5000. Текущая UI-шкала 7000/5000 требует отдельной правки.",
+    "1.6 TD: динамическая система давления масла 0.3/1.8 бар — второй вход опционален (GPB1).",
+    "Кривые температуры/топлива проверить по дизельным датчикам; они могут отличаться от waterboxer.",
     "Записи signal:* и car:GND — именованные внешние цепи автомобиля, а не детали на плате.",
     "Диаграмма: wiring.svg / wiring.png; подробный netlist: wiring.json."
   ]
