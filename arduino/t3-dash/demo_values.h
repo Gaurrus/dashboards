@@ -35,10 +35,13 @@ inline Values make(float t) {
 
   v.oilWarning = wrap(t, 20.0f) < 2.0f;
   v.chargeWarning = wrap(t, 30.0f) > 28.0f;
-  v.highBeam = wrap(t, 12.0f) < 5.0f;
+  v.lowBeam = wrap(t, 12.0f) < 5.0f;
+  v.highBeam = !v.lowBeam;
+  v.fogLight = wrap(t, 9.0f) < 4.0f;
   v.turnLeft = wrap(t, 8.0f) < 1.5f;
   v.turnRight = wrap(t, 11.0f) < 1.5f;
   v.glowPlug = wrap(t, 15.0f) < 3.0f;
+  v.parkingBrake = wrap(t, 13.0f) < 4.0f;
 
   return v;
 }

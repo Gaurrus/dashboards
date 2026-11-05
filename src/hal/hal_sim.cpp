@@ -44,6 +44,7 @@ void Hal::poll(RawInputs& out) {
   // Buttons are active-low (INPUT_PULLUP).
   out.oilWarning = digitalRead(cfg::PIN_BTN_OIL) == LOW;
   out.highBeam = digitalRead(cfg::PIN_BTN_BEAM) == LOW;
+  out.lowBeam = false;
   out.turnLeft = digitalRead(cfg::PIN_BTN_TURN_L) == LOW;
 
   out.chargeWarning = false;

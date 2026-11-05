@@ -22,6 +22,7 @@ struct RawInputs {
   bool oilWarning = false;
   bool chargeWarning = false;
   bool highBeam = false;
+  bool lowBeam = false;
   bool turnLeft = false;
   bool turnRight = false;
   bool glowPlug = false;

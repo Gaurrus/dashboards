@@ -8,5 +8,11 @@ namespace ui {
 
 void init();
 void update(const Values& v);
+void skipBoot();
+
+// Screen brightness in percent (0..100). Implemented as a black overlay so it
+// works on panels whose backlight is switch-only (Waveshare 7").
+void setBrightness(int percent);
+int brightness();
 
 }  // namespace ui
