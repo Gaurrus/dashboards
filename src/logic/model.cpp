@@ -34,6 +34,7 @@ void DashboardModel::update(const RawInputs& raw, float dt) {
   applyFilter(raw.batteryValid, raw.batteryV, aSlow, batterySeeded_, v_.batteryV,
               v_.batteryValid);
 
+  v_.ignitionOn = raw.ignitionOn;
   v_.oilWarning = raw.oilWarning;
   v_.chargeWarning = raw.chargeWarning;
   v_.highBeam = raw.highBeam;

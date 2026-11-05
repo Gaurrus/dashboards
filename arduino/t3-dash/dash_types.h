@@ -20,6 +20,8 @@ struct Values {
 
   float odometerKm = 0.0f;
 
+  bool ignitionOn = true;  // false while the key is off: show the goodbye screen
+
   bool oilWarning = false;
   bool chargeWarning = false;
   bool highBeam = false;

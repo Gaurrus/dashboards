@@ -64,8 +64,9 @@ void Hal::begin() {
   pinMode(cfg::PIN_TURN_R, INPUT_PULLUP);
   pinMode(cfg::PIN_GLOW, INPUT_PULLUP);
 
-  // Input-only pin: relies on the external 10k pull-up.
+  // Input-only pins: rely on external 10k pull-ups to 3.3V.
   pinMode(cfg::PIN_RPM_IN, INPUT);
+  pinMode(cfg::PIN_IGNITION, INPUT);
   attachInterrupt(digitalPinToInterrupt(cfg::PIN_RPM_IN), onRpmPulse, FALLING);
 
   pinMode(cfg::PIN_BUZZER, OUTPUT);
@@ -128,6 +129,9 @@ void Hal::poll(RawInputs& out) {
   }
   out.rpm = rpmMeasured_;
   out.rpmValid = rpmReady_;
+
+  // --- Ignition (active-low via optocoupler) ---
+  out.ignitionOn = digitalRead(cfg::PIN_IGNITION) == LOW;
 
   // --- Warning / indicator inputs (active-low) ---
   out.oilWarning = digitalRead(cfg::PIN_OIL) == LOW;

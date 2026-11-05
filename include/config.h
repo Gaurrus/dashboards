@@ -22,6 +22,7 @@ constexpr int PIN_BUZZER = 33;
 
 // GPIO34..39 are input-only and have no internal pull-ups: add an external 10k to 3.3V.
 constexpr int PIN_RPM_IN = 34;  // PC817 collector, active-low pulse
+constexpr int PIN_IGNITION = 35;  // PC817 collector, active-low, external 10k to 3.3V
 
 constexpr int PIN_OIL     = 25;
 constexpr int PIN_CHARGE  = 26;
@@ -40,8 +41,8 @@ constexpr uint32_t GPS_BAUD = 9600;
 
 // ===================== Gauge ranges =====================
 constexpr float SPEED_MAX_KMH = 180.0f;
-constexpr float RPM_MAX       = 7000.0f;
-constexpr float RPM_REDLINE   = 5500.0f;
+constexpr float RPM_MAX       = 5500.0f;
+constexpr float RPM_REDLINE   = 4500.0f;
 
 constexpr float TEMP_MIN_C  = 40.0f;
 constexpr float TEMP_MAX_C  = 130.0f;

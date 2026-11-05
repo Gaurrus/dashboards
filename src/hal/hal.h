@@ -7,6 +7,8 @@ struct RawInputs {
   float speedKmh = 0.0f;
   bool speedValid = false;
 
+  bool ignitionOn = true;
+
   float rpm = 0.0f;
   bool rpmValid = false;
 

@@ -1,0 +1,1 @@
+../../assets/bye_gif.c

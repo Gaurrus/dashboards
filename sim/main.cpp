@@ -27,6 +27,7 @@ lv_indev_drv_t gMouseDrv;
 int gMouseX = 0;
 int gMouseY = 0;
 bool gMouseDown = false;
+bool gIgnitionOn = true;
 
 void mouseReadCb(lv_indev_drv_t* /*drv*/, lv_indev_data_t* data) {
   data->point.x = gMouseX;
@@ -47,6 +48,39 @@ void updateBrightnessDemoMouse(float t) {
   } else {
     gMouseDown = false;
     gMouseY = 360;
+  }
+}
+
+// Timeline for the "all features" preview:
+// 8-9.2 s dim, 11-12.2 s brighten, 16-16.8 s back to 100%.
+void updateAllDemoMouse(float t) {
+  gMouseX = 760;
+  gMouseDown = false;
+  gMouseY = 360;
+  if (t >= 7.5f && t < 8.7f) {
+    gMouseDown = true;
+    gMouseY = 120 + (int)((t - 7.5f) / 1.2f * 240.0f);
+  } else if (t >= 10.2f && t < 11.4f) {
+    gMouseDown = true;
+    gMouseY = 360 - (int)((t - 10.2f) / 1.2f * 180.0f);
+  } else if (t >= 12.8f && t < 13.0f) {
+    // Tap the analog clock to open SET TIME.
+    gMouseX = 120;
+    gMouseY = 230;
+    gMouseDown = (t < 12.92f);
+  } else if (t >= 13.6f && t < 14.4f) {
+    // Drag the minute roller.
+    gMouseX = 500;
+    gMouseDown = true;
+    gMouseY = 240 - (int)((t - 13.6f) / 0.8f * 50.0f);
+  } else if (t >= 15.0f && t < 15.15f) {
+    // Tap SET.
+    gMouseX = 500;
+    gMouseY = 345;
+    gMouseDown = (t < 15.07f);
+  } else if (t >= 16.0f && t < 16.8f) {
+    gMouseDown = true;
+    gMouseY = 360 - (int)((t - 16.0f) / 0.8f * 240.0f);
   }
 }
 
@@ -116,8 +150,12 @@ int main(int argc, char** argv) {
   const bool lowShot = argc >= 3 && SDL_strcmp(argv[2], "low") == 0;
   const bool videoShot = argc >= 3 && SDL_strcmp(argv[2], "video") == 0;
   const bool videoBrightShot = argc >= 3 && SDL_strcmp(argv[2], "video_bright") == 0;
+  const bool videoAllShot = argc >= 3 && SDL_strcmp(argv[2], "video_all") == 0;
   const bool dimShot = argc >= 3 && SDL_strcmp(argv[2], "dim") == 0;
   const bool swipeShot = argc >= 3 && SDL_strcmp(argv[2], "swipe") == 0;
+  const bool byeShot = argc >= 3 && SDL_strcmp(argv[2], "bye") == 0;
+  const bool clockShot = argc >= 3 && SDL_strcmp(argv[2], "clock") == 0;
+  const bool clocksetShot = argc >= 3 && SDL_strcmp(argv[2], "clockset") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -171,7 +209,7 @@ int main(int argc, char** argv) {
 
   ui::init();
   if (screenshot && !bootShot && !sweepShot && !hotShot && !videoShot &&
-      !videoBrightShot) {
+      !videoBrightShot && !videoAllShot) {
     ui::skipBoot();
   }
   if (sweepShot) {
@@ -199,18 +237,51 @@ int main(int argc, char** argv) {
     lv_tick_inc(16);
     lv_timer_handler();
   }
+  if (clockShot) {
+    ui::setClock(10, 8, 0);
+  }
+  if (clocksetShot) {
+    ui::setClock(10, 8, 0);
+    ui::update(demo::make(0.0f));
+    gMouseX = 120;
+    gMouseY = 230;
+    gMouseDown = true;
+    for (int i = 0; i < 3; ++i) {
+      lv_tick_inc(20);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 3; ++i) {
+      lv_tick_inc(20);
+      lv_timer_handler();
+    }
+  }
+  if (byeShot) {
+    // Optional third argument: how long the ignition stays off, in ms.
+    const int holdMs = argc >= 4 ? atoi(argv[3]) : 400;
+    ui::update(demo::make(0.0f, false));
+    for (int i = 0; i < holdMs / 20; ++i) {
+      lv_tick_inc(20);
+      ui::update(demo::make(0.0f, false));
+      lv_timer_handler();
+    }
+  }
 
-  if (videoShot || videoBrightShot) {
-    // Usage: t3dash_sim <output_dir> video|video_bright [seconds] [fps]
+  if (videoShot || videoBrightShot || videoAllShot) {
+    // Usage: t3dash_sim <output_dir> video|video_bright|video_all [seconds] [fps]
     const float seconds = argc >= 4 ? (float)atof(argv[3]) : 10.0f;
     const int fps = argc >= 5 ? atoi(argv[4]) : 30;
     const int frameCount = (int)(seconds * fps + 0.5f);
     for (int i = 0; i < frameCount; ++i) {
       const float ft = (float)i / (float)fps;
+      bool ignitionOn = true;
       if (videoBrightShot) {
         updateBrightnessDemoMouse(ft);
+      } else if (videoAllShot) {
+        updateAllDemoMouse(ft);
+        ignitionOn = !(ft >= 18.0f && ft < 23.0f);
       }
-      ui::update(demo::make(ft));
+      ui::update(demo::make(ft, ignitionOn));
       lv_tick_inc(1000 / fps);
       lv_timer_handler();
       lv_refr_now(lv_disp_get_default());
@@ -225,7 +296,7 @@ int main(int argc, char** argv) {
   uint32_t lastTick = SDL_GetTicks();
 
   for (int frame = 0; frame < 4; ++frame) {
-    ui::update(demo::make(t));
+    ui::update(demo::make(t, !byeShot));
     const uint32_t now = SDL_GetTicks();
     lv_tick_inc(now - lastTick);
     lastTick = now;
@@ -254,7 +325,7 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  printf("VW T3 dashboard simulator running. Close the window or press Esc to exit.\n");
+  printf("VW T3 dashboard simulator running. Esc exits, I toggles ignition.\n");
   fflush(stdout);
 
   while (true) {
@@ -265,6 +336,9 @@ int main(int argc, char** argv) {
       }
       if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
         return 0;
+      }
+      if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_i) {
+        gIgnitionOn = !gIgnitionOn;
       }
       if (event.type == SDL_MOUSEMOTION) {
         gMouseX = event.motion.x;
@@ -282,7 +356,7 @@ int main(int argc, char** argv) {
       }
     }
 
-    ui::update(demo::make(t));
+    ui::update(demo::make(t, gIgnitionOn));
 
     const uint32_t now = SDL_GetTicks();
     lv_tick_inc(now - lastTick);
