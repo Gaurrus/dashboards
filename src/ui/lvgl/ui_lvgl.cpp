@@ -64,6 +64,7 @@ lv_obj_t* g_iconChg = nullptr;
 lv_obj_t* g_iconGlow = nullptr;
 lv_obj_t* g_iconBeam = nullptr;
 lv_obj_t* g_iconLowBeam = nullptr;
+lv_obj_t* g_iconFog = nullptr;
 lv_obj_t* g_turnLeft = nullptr;
 lv_obj_t* g_turnRight = nullptr;
 lv_color_t g_leftArrowBuf[ARROW_W * ARROW_H];
@@ -601,6 +602,7 @@ void applyValues(const Values& v) {
   setIconState(g_iconOil, v.oilWarning);
   setIconState(g_iconChg, v.chargeWarning);
   setIconState(g_iconGlow, v.glowPlug);
+  setIconState(g_iconFog, v.fogLight);
 
   if (v.highBeam) {
     lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_0, 0);
@@ -675,11 +677,12 @@ void init() {
   lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
   // Status icons are grouped in the middle of the top row.
-  g_iconOil = createStatusIcon(screen, &icon_oil, 310, COL_RED);
-  g_iconChg = createStatusIcon(screen, &icon_charge, 360, COL_RED);
-  g_iconGlow = createStatusIcon(screen, &icon_glow, 410, COL_YELLOW);
-  g_iconLowBeam = createStatusIcon(screen, &icon_beam_low, 460, COL_GREEN);
-  g_iconBeam = createStatusIcon(screen, &icon_beam_high, 460, COL_BLUE);
+  g_iconOil = createStatusIcon(screen, &icon_oil, 285, COL_RED);
+  g_iconChg = createStatusIcon(screen, &icon_charge, 335, COL_RED);
+  g_iconGlow = createStatusIcon(screen, &icon_glow, 385, COL_YELLOW);
+  g_iconFog = createStatusIcon(screen, &icon_fog, 435, COL_GREEN);
+  g_iconLowBeam = createStatusIcon(screen, &icon_beam_low, 485, COL_GREEN);
+  g_iconBeam = createStatusIcon(screen, &icon_beam_high, 485, COL_BLUE);
 
   // Classic VW turn signal arrows: left on the left edge, right on the right edge.
   g_turnLeft = createTurnArrow(screen, 20, 2, true, g_leftArrowBuf);
@@ -837,6 +840,7 @@ void update(const Values& v) {
     selfTest.glowPlug = true;
     selfTest.highBeam = true;
     selfTest.lowBeam = false;
+    selfTest.fogLight = true;
     selfTest.turnLeft = true;
     selfTest.turnRight = true;
 
