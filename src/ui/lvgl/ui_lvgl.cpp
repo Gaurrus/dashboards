@@ -66,7 +66,12 @@ lv_color_t g_leftArrowBuf[ARROW_W * ARROW_H];
 lv_color_t g_rightArrowBuf[ARROW_W * ARROW_H];
 
 lv_obj_t* g_clockTime = nullptr;
-lv_obj_t* g_clockSeconds = nullptr;
+lv_obj_t* g_hourLine = nullptr;
+lv_obj_t* g_minuteLine = nullptr;
+lv_obj_t* g_secondLine = nullptr;
+lv_point_t g_hourHand[2];
+lv_point_t g_minuteHand[2];
+lv_point_t g_secondHand[2];
 
 lv_obj_t* makeLabel(lv_obj_t* parent, const char* text, const lv_font_t* font,
                     uint32_t color) {
@@ -190,6 +195,15 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
   return g;
 }
 
+void setHandPoints(lv_point_t* points, int size, float angleDeg, int length) {
+  const float rad = angleDeg * 3.14159265f / 180.0f;
+  const int center = size / 2;
+  points[0].x = center;
+  points[0].y = center;
+  points[1].x = center + (lv_coord_t)(sinf(rad) * length);
+  points[1].y = center - (lv_coord_t)(cosf(rad) * length);
+}
+
 void createClock(lv_obj_t* parent, int x, int y, int size) {
   lv_obj_t* box = lv_obj_create(parent);
   lv_obj_remove_style_all(box);
@@ -224,14 +238,60 @@ void createClock(lv_obj_t* parent, int x, int y, int size) {
     lv_obj_align(dot, LV_ALIGN_CENTER, dx, dy);
   }
 
-  lv_obj_t* caption = makeLabel(box, "TIME", &lv_font_montserrat_14, COL_DIM);
-  lv_obj_align(caption, LV_ALIGN_CENTER, 0, -62);
+  // Digital block below the centre.
+  lv_obj_t* panel = lv_obj_create(box);
+  lv_obj_set_size(panel, 108, 38);
+  lv_obj_align(panel, LV_ALIGN_CENTER, 0, 50);
+  lv_obj_set_style_bg_color(panel, lv_color_hex(0x11161B), 0);
+  lv_obj_set_style_bg_opa(panel, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_radius(panel, 6, 0);
+  lv_obj_set_style_border_width(panel, 1, 0);
+  lv_obj_set_style_border_color(panel, lv_color_hex(COL_TRACK), 0);
+  lv_obj_set_style_pad_all(panel, 0, 0);
+  lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(panel, LV_OBJ_FLAG_CLICKABLE);
 
-  g_clockTime = makeLabel(box, "--:--", &lv_font_montserrat_48, COL_TEXT);
-  lv_obj_align(g_clockTime, LV_ALIGN_CENTER, 0, -6);
+  g_clockTime = makeLabel(panel, "--:--", &lv_font_montserrat_24, COL_TEXT);
+  lv_obj_align(g_clockTime, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_style_bg_color(g_clockTime, lv_color_hex(0x11161B), 0);
+  lv_obj_set_style_bg_opa(g_clockTime, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_hor(g_clockTime, 4, 0);
+  lv_obj_set_style_pad_ver(g_clockTime, 1, 0);
 
-  g_clockSeconds = makeLabel(box, "--", &lv_font_montserrat_20, COL_DIM);
-  lv_obj_align(g_clockSeconds, LV_ALIGN_CENTER, 0, 44);
+  auto createHand = [&](uint32_t color, int width) {
+    lv_obj_t* line = lv_line_create(box);
+    lv_obj_set_size(line, size, size);
+    lv_obj_set_pos(line, 0, 0);
+    lv_obj_set_style_line_width(line, width, 0);
+    lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
+    lv_obj_set_style_line_rounded(line, true, 0);
+    lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
+    return line;
+  };
+
+  g_hourLine = createHand(COL_TEXT, 5);
+  g_minuteLine = createHand(COL_TEXT, 3);
+  g_secondLine = createHand(COL_ORANGE, 2);
+
+  setHandPoints(g_hourHand, size, 0.0f, 42);
+  setHandPoints(g_minuteHand, size, 0.0f, 62);
+  setHandPoints(g_secondHand, size, 0.0f, 72);
+  lv_line_set_points(g_hourLine, g_hourHand, 2);
+  lv_line_set_points(g_minuteLine, g_minuteHand, 2);
+  lv_line_set_points(g_secondLine, g_secondHand, 2);
+
+  // Keep the digital block above the hands so it is always readable.
+  lv_obj_move_foreground(panel);
+
+  lv_obj_t* hub = lv_obj_create(box);
+  lv_obj_remove_style_all(hub);
+  lv_obj_set_size(hub, 10, 10);
+  lv_obj_set_style_radius(hub, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(hub, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_bg_opa(hub, LV_OPA_COVER, 0);
+  lv_obj_align(hub, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_clear_flag(hub, LV_OBJ_FLAG_CLICKABLE);
 }
 
 void updateGauge(Gauge& g, float value, bool valid, uint32_t accent) {
@@ -428,7 +488,9 @@ void updateClock() {
   if (tmv == nullptr || now < 1600000000) {
     if (lastSecond != -1) {
       lv_label_set_text(g_clockTime, "--:--");
-      lv_label_set_text(g_clockSeconds, "--");
+      lv_obj_add_flag(g_hourLine, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(g_minuteLine, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(g_secondLine, LV_OBJ_FLAG_HIDDEN);
       lastSecond = -1;
     }
     return;
@@ -439,12 +501,24 @@ void updateClock() {
   }
   lastSecond = tmv->tm_sec;
 
+  lv_obj_clear_flag(g_hourLine, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(g_minuteLine, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(g_secondLine, LV_OBJ_FLAG_HIDDEN);
+
+  const float hourAngle = ((tmv->tm_hour % 12) + tmv->tm_min / 60.0f) * 30.0f;
+  const float minuteAngle = (tmv->tm_min + tmv->tm_sec / 60.0f) * 6.0f;
+  const float secondAngle = tmv->tm_sec * 6.0f;
+
+  setHandPoints(g_hourHand, CLOCK_SIZE, hourAngle, 42);
+  setHandPoints(g_minuteHand, CLOCK_SIZE, minuteAngle, 62);
+  setHandPoints(g_secondHand, CLOCK_SIZE, secondAngle, 72);
+  lv_line_set_points(g_hourLine, g_hourHand, 2);
+  lv_line_set_points(g_minuteLine, g_minuteHand, 2);
+  lv_line_set_points(g_secondLine, g_secondHand, 2);
+
   char text[8];
   snprintf(text, sizeof(text), "%02d:%02d", tmv->tm_hour, tmv->tm_min);
   lv_label_set_text(g_clockTime, text);
-
-  snprintf(text, sizeof(text), "%02d", tmv->tm_sec);
-  lv_label_set_text(g_clockSeconds, text);
 }
 
 }  // namespace
