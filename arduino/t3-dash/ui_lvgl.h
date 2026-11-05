@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "dash_types.h"
 
 // LVGL 8.4 dashboard, designed for 800x480.
@@ -14,5 +16,11 @@ void skipBoot();
 // works on panels whose backlight is switch-only (Waveshare 7").
 void setBrightness(int percent);
 int brightness();
+
+// Independent internal clock (time of day, no external RTC/NTP required).
+// The clock keeps running from the UI tick; call setClock() to set it.
+void setClock(int hour, int minute, int second = 0);
+uint32_t clockSeconds();
+bool consumeClockChanged();
 
 }  // namespace ui

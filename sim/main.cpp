@@ -57,12 +57,27 @@ void updateAllDemoMouse(float t) {
   gMouseX = 760;
   gMouseDown = false;
   gMouseY = 360;
-  if (t >= 8.0f && t < 9.2f) {
+  if (t >= 7.5f && t < 8.7f) {
     gMouseDown = true;
-    gMouseY = 120 + (int)((t - 8.0f) / 1.2f * 240.0f);
-  } else if (t >= 11.0f && t < 12.2f) {
+    gMouseY = 120 + (int)((t - 7.5f) / 1.2f * 240.0f);
+  } else if (t >= 10.2f && t < 11.4f) {
     gMouseDown = true;
-    gMouseY = 360 - (int)((t - 11.0f) / 1.2f * 180.0f);
+    gMouseY = 360 - (int)((t - 10.2f) / 1.2f * 180.0f);
+  } else if (t >= 12.8f && t < 13.0f) {
+    // Tap the analog clock to open SET TIME.
+    gMouseX = 120;
+    gMouseY = 230;
+    gMouseDown = (t < 12.92f);
+  } else if (t >= 13.6f && t < 14.4f) {
+    // Drag the minute roller.
+    gMouseX = 500;
+    gMouseDown = true;
+    gMouseY = 240 - (int)((t - 13.6f) / 0.8f * 50.0f);
+  } else if (t >= 15.0f && t < 15.15f) {
+    // Tap SET.
+    gMouseX = 500;
+    gMouseY = 345;
+    gMouseDown = (t < 15.07f);
   } else if (t >= 16.0f && t < 16.8f) {
     gMouseDown = true;
     gMouseY = 360 - (int)((t - 16.0f) / 0.8f * 240.0f);
@@ -139,6 +154,8 @@ int main(int argc, char** argv) {
   const bool dimShot = argc >= 3 && SDL_strcmp(argv[2], "dim") == 0;
   const bool swipeShot = argc >= 3 && SDL_strcmp(argv[2], "swipe") == 0;
   const bool byeShot = argc >= 3 && SDL_strcmp(argv[2], "bye") == 0;
+  const bool clockShot = argc >= 3 && SDL_strcmp(argv[2], "clock") == 0;
+  const bool clocksetShot = argc >= 3 && SDL_strcmp(argv[2], "clockset") == 0;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -219,6 +236,25 @@ int main(int argc, char** argv) {
     gMouseDown = false;
     lv_tick_inc(16);
     lv_timer_handler();
+  }
+  if (clockShot) {
+    ui::setClock(10, 8, 0);
+  }
+  if (clocksetShot) {
+    ui::setClock(10, 8, 0);
+    ui::update(demo::make(0.0f));
+    gMouseX = 120;
+    gMouseY = 230;
+    gMouseDown = true;
+    for (int i = 0; i < 3; ++i) {
+      lv_tick_inc(20);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 3; ++i) {
+      lv_tick_inc(20);
+      lv_timer_handler();
+    }
   }
   if (byeShot) {
     // Optional third argument: how long the ignition stays off, in ms.
