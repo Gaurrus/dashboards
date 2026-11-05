@@ -17,6 +17,7 @@ constexpr uint32_t COL_CYAN = 0x22D3EE;
 constexpr uint32_t COL_ORANGE = 0xF59E0B;
 constexpr uint32_t COL_RED = 0xEF4444;
 constexpr uint32_t COL_GREEN = 0x22C55E;
+constexpr uint32_t COL_DARK_GREEN = 0x15803D;
 constexpr uint32_t COL_YELLOW = 0xEAB308;
 constexpr uint32_t COL_BLUE = 0x3B82F6;
 constexpr uint32_t COL_TICK = 0x9CA3AF;
@@ -35,6 +36,9 @@ struct Gauge {
   lv_obj_t* value = nullptr;
   int32_t max = 0;
   bool div1000 = false;
+  int segmentCount = 0;
+  float segmentStep = 0.0f;
+  lv_obj_t* segments[80] = {};
 };
 
 Gauge g_speed;
@@ -123,11 +127,52 @@ void addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rIn
   lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
 }
 
+uint32_t lerpColor(uint32_t from, uint32_t to, float t) {
+  if (t < 0.0f) {
+    t = 0.0f;
+  }
+  if (t > 1.0f) {
+    t = 1.0f;
+  }
+  const int r1 = (from >> 16) & 0xFF;
+  const int g1 = (from >> 8) & 0xFF;
+  const int b1 = from & 0xFF;
+  const int r2 = (to >> 16) & 0xFF;
+  const int g2 = (to >> 8) & 0xFF;
+  const int b2 = to & 0xFF;
+  const int r = r1 + (int)((r2 - r1) * t);
+  const int g = g1 + (int)((g2 - g1) * t);
+  const int b = b1 + (int)((b2 - b1) * t);
+  return (uint32_t)((r << 16) | (g << 8) | b);
+}
+
+uint32_t rpmColor(float value) {
+  if (value <= 3000.0f) {
+    return COL_DARK_GREEN;
+  }
+  if (value >= 5000.0f) {
+    return COL_RED;
+  }
+  if (value < 3500.0f) {
+    return lerpColor(COL_DARK_GREEN, COL_GREEN, (value - 3000.0f) / 500.0f);
+  }
+  if (value < 4000.0f) {
+    return lerpColor(COL_GREEN, COL_YELLOW, (value - 3500.0f) / 500.0f);
+  }
+  if (value < 4500.0f) {
+    return lerpColor(COL_YELLOW, COL_ORANGE, (value - 4000.0f) / 500.0f);
+  }
+  return lerpColor(COL_ORANGE, COL_RED, (value - 4500.0f) / 500.0f);
+}
+
 Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
                   const char* unit, int32_t max, uint32_t accent, float redlineFrac,
                   float tickStep, float labelStep, bool div1000, int arcWidth,
                   const lv_font_t* valueFont, const lv_font_t* titleFont,
-                  const lv_font_t* unitFont) {
+                  const lv_font_t* unitFont, bool segmentedFill = false,
+                  float segStart = 0.0f, float segEnd = 0.0f, uint32_t segFrom = 0,
+                  uint32_t segTo = 0, float segStep = 0.0f,
+                  uint32_t (*colorFn)(float) = nullptr) {
   lv_obj_t* box = lv_obj_create(parent);
   lv_obj_remove_style_all(box);
   lv_obj_set_size(box, size, size);
@@ -135,6 +180,10 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
   lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
   lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(box, LV_OBJ_FLAG_CLICKABLE);
+
+  Gauge g;
+  g.max = max;
+  g.div1000 = div1000;
 
   lv_obj_t* arc = lv_arc_create(box);
   lv_obj_set_size(arc, size, size);
@@ -149,8 +198,13 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
   lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR);
   lv_obj_set_style_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB);
   lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+  g.arc = arc;
 
-  if (redlineFrac > 0.0f) {
+  if (segmentedFill) {
+    lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_INDICATOR);
+  }
+
+  if (!segmentedFill && redlineFrac > 0.0f) {
     lv_obj_t* red = lv_arc_create(box);
     lv_obj_set_size(red, size, size);
     lv_obj_center(red);
@@ -162,6 +216,40 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
     lv_obj_set_style_arc_opa(red, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_set_style_opa(red, LV_OPA_TRANSP, LV_PART_KNOB);
     lv_obj_clear_flag(red, LV_OBJ_FLAG_CLICKABLE);
+  }
+
+  if (segmentedFill && segStep > 0.0f) {
+    const int total = (int)((float)max / segStep + 0.5f);
+    for (int i = 0; i < total && g.segmentCount < 80; ++i) {
+      const float startValue = i * segStep;
+      const float endValue = fminf((i + 1) * segStep, (float)max);
+      const float startAngle = 135.0f + 270.0f * (startValue / (float)max);
+      const float endAngle = 135.0f + 270.0f * (endValue / (float)max);
+      const float midValue = (startValue + endValue) * 0.5f;
+
+      uint32_t color = segTo;
+      if (colorFn != nullptr) {
+        color = colorFn(midValue);
+      } else if (midValue <= segStart) {
+        color = segFrom;
+      } else if (midValue < segEnd) {
+        color = lerpColor(segFrom, segTo, (midValue - segStart) / (segEnd - segStart));
+      }
+
+      lv_obj_t* segment = lv_arc_create(box);
+      lv_obj_set_size(segment, size, size);
+      lv_obj_center(segment);
+      lv_arc_set_bg_angles(segment, (int32_t)startAngle, (int32_t)endAngle);
+      lv_obj_set_style_arc_width(segment, arcWidth, LV_PART_MAIN);
+      lv_obj_set_style_arc_color(segment, lv_color_hex(color), LV_PART_MAIN);
+      lv_obj_set_style_arc_rounded(segment, true, LV_PART_MAIN);
+      lv_obj_set_style_arc_opa(segment, LV_OPA_TRANSP, LV_PART_INDICATOR);
+      lv_obj_set_style_opa(segment, LV_OPA_TRANSP, LV_PART_KNOB);
+      lv_obj_clear_flag(segment, LV_OBJ_FLAG_CLICKABLE);
+      lv_obj_add_flag(segment, LV_OBJ_FLAG_HIDDEN);
+      g.segments[g.segmentCount++] = segment;
+    }
+    g.segmentStep = segStep;
   }
 
   const int tickCount = (int)((float)max / tickStep + 0.5f);
@@ -210,11 +298,7 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
     lv_obj_align(unitLabel, LV_ALIGN_CENTER, 0, (int)(size * 0.17f));
   }
 
-  Gauge g;
-  g.arc = arc;
   g.value = valueLabel;
-  g.max = max;
-  g.div1000 = div1000;
   return g;
 }
 
@@ -325,9 +409,29 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent) {
   if (arcValue > g.max) {
     arcValue = g.max;
   }
-  lv_arc_set_value(g.arc, arcValue);
-  lv_obj_set_style_arc_color(g.arc, lv_color_hex(valid ? accent : COL_TRACK),
-                             LV_PART_INDICATOR);
+  if (g.segmentCount > 0) {
+    int visible = 0;
+    if (valid && g.segmentStep > 0.0f) {
+      visible = (int)(value / g.segmentStep);
+    }
+    if (visible < 0) {
+      visible = 0;
+    }
+    if (visible > g.segmentCount) {
+      visible = g.segmentCount;
+    }
+    for (int i = 0; i < g.segmentCount; ++i) {
+      if (i < visible) {
+        lv_obj_clear_flag(g.segments[i], LV_OBJ_FLAG_HIDDEN);
+      } else {
+        lv_obj_add_flag(g.segments[i], LV_OBJ_FLAG_HIDDEN);
+      }
+    }
+  } else {
+    lv_arc_set_value(g.arc, arcValue);
+    lv_obj_set_style_arc_color(g.arc, lv_color_hex(valid ? accent : COL_TRACK),
+                               LV_PART_INDICATOR);
+  }
 
   char text[24];
   if (!valid) {
@@ -675,9 +779,10 @@ void init() {
                         &lv_font_montserrat_24, &lv_font_montserrat_20);
 
   g_rpm = createGauge(screen, 576, 125, SIDE_SIZE, "", "RPM x1000", 7000, COL_ORANGE,
-                      5500.0f / 7000.0f, 500.0f, 1000.0f, true, 14,
+                      5000.0f / 7000.0f, 500.0f, 1000.0f, true, 14,
                       &lv_font_montserrat_32, &lv_font_montserrat_12,
-                      &lv_font_montserrat_12);
+                      &lv_font_montserrat_12, true, 3000.0f, 5000.0f, COL_DARK_GREEN,
+                      COL_RED, 100.0f, rpmColor);
 
   g_voltage = makeLabel(screen, "--.-V", &lv_font_montserrat_32, COL_GREEN);
   lv_obj_align(g_voltage, LV_ALIGN_CENTER, 0, 168);
