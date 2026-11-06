@@ -325,34 +325,28 @@ void setIconState(lv_obj_t* icon, bool on) {
   lv_obj_set_style_img_opa(icon, on ? LV_OPA_COVER : LV_OPA_20, 0);
 }
 
-lv_obj_t* createStatusIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y,
-                           uint32_t color) {
+lv_obj_t* createStatusIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y) {
   lv_obj_t* icon = lv_img_create(parent);
   lv_img_set_src(icon, src);
   lv_obj_set_pos(icon, x, y);
-  lv_obj_set_style_img_recolor(icon, lv_color_hex(color), 0);
-  lv_obj_set_style_img_recolor_opa(icon, LV_OPA_COVER, 0);
   lv_obj_set_style_img_opa(icon, LV_OPA_20, 0);
   return icon;
 }
 
-lv_obj_t* createOrbitIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int index,
-                          uint32_t color) {
+lv_obj_t* createOrbitIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int index) {
   const float deg = ICON_ORBIT_START_DEG + ICON_ORBIT_STEP_DEG * index;
   const float rad = deg * 3.14159265f / 180.0f;
   const int cx = (int)(SPEED_CX + ICON_ORBIT_R * sinf(rad) + 0.5f);
   const int cy = (int)(SPEED_CY - ICON_ORBIT_R * cosf(rad) + 0.5f);
   const int iw = (int)src->header.w;
   const int ih = (int)src->header.h;
-  return createStatusIcon(parent, src, cx - iw / 2, cy - ih / 2, color);
+  return createStatusIcon(parent, src, cx - iw / 2, cy - ih / 2);
 }
 
 lv_obj_t* createTurnArrow(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y) {
   lv_obj_t* arrow = lv_img_create(parent);
   lv_img_set_src(arrow, src);
   lv_obj_set_pos(arrow, x, y);
-  lv_obj_set_style_img_recolor(arrow, lv_color_hex(COL_TURN), 0);
-  lv_obj_set_style_img_recolor_opa(arrow, LV_OPA_COVER, 0);
   lv_obj_add_flag(arrow, LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(arrow, LV_OBJ_FLAG_CLICKABLE);
   return arrow;
@@ -676,13 +670,13 @@ void init() {
   lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
   // Status icons follow an arc concentric with the speedometer.
-  g_iconOil = createOrbitIcon(screen, &icon_oil, 0, COL_RED);
-  g_iconChg = createOrbitIcon(screen, &icon_charge, 1, COL_RED);
-  g_iconBrake = createOrbitIcon(screen, &icon_brake, 2, COL_RED);
-  g_iconGlow = createOrbitIcon(screen, &icon_glow, 3, COL_YELLOW);
-  g_iconFog = createOrbitIcon(screen, &icon_fog, 4, COL_GREEN);
-  g_iconLowBeam = createOrbitIcon(screen, &icon_beam_low, 5, COL_GREEN);
-  g_iconBeam = createOrbitIcon(screen, &icon_beam_high, 5, COL_BLUE);
+  g_iconOil = createOrbitIcon(screen, &icon_oil, 0);
+  g_iconChg = createOrbitIcon(screen, &icon_charge, 1);
+  g_iconBrake = createOrbitIcon(screen, &icon_brake, 2);
+  g_iconGlow = createOrbitIcon(screen, &icon_glow, 3);
+  g_iconFog = createOrbitIcon(screen, &icon_anti_fog, 4);
+  g_iconLowBeam = createOrbitIcon(screen, &icon_beam_low, 5);
+  g_iconBeam = createOrbitIcon(screen, &icon_beam_high, 5);
 
   // Classic VW turn signal arrows: left on the left edge, right on the right edge.
   g_turnLeft = createTurnArrow(screen, &icon_arrow_left, 20, 8);
