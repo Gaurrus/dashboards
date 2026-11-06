@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -14,6 +15,7 @@ namespace {
 constexpr int kWidth = 800;
 constexpr int kHeight = 480;
 constexpr uint32_t kFrameMs = 33;  // ~30 FPS, same cadence as the dashboard
+constexpr float kEspRenderSlowdown = 2.0f;  // host -> ESP32-S3 render cost model
 
 SDL_Window* gWindow = nullptr;
 SDL_Renderer* gRenderer = nullptr;
@@ -29,10 +31,13 @@ lv_indev_drv_t gMouseDrv;
 lv_obj_t* gPerfPanel = nullptr;
 lv_obj_t* gPerfFpsLabel = nullptr;
 lv_obj_t* gPerfCpuLabel = nullptr;
+lv_obj_t* gPerfEspLabel = nullptr;
 lv_obj_t* gPerfMemLabel = nullptr;
 uint32_t gFrameCounter = 0;
 uint32_t gPerfLastMs = 0;
 clock_t gPerfLastCpu = 0;
+uint64_t gPerfFreq = 0;
+float gRenderMs = 0.0f;
 
 int gMouseX = 0;
 int gMouseY = 0;
@@ -59,14 +64,18 @@ void perfUpdateCb(lv_timer_t* /*timer*/) {
   lv_mem_monitor_t mon;
   lv_mem_monitor(&mon);
   const uint32_t usedKb = (mon.total_size - mon.free_size) / 1024U;
+  const float espCpu = fminf(
+      100.0f, gRenderMs * kEspRenderSlowdown / (1000.0f / 30.0f) * 100.0f);
 
   char text[48];
   snprintf(text, sizeof(text), "FPS: %u", (unsigned)fps);
   lv_label_set_text(gPerfFpsLabel, text);
-  snprintf(text, sizeof(text), "CPU: %u%% host", (unsigned)(cpu + 0.5f));
+  snprintf(text, sizeof(text), "CPU host: %u%%", (unsigned)(cpu + 0.5f));
   lv_label_set_text(gPerfCpuLabel, text);
-  snprintf(text, sizeof(text), "RAM: %u%% (%u KB)", (unsigned)mon.used_pct,
-           (unsigned)usedKb);
+  snprintf(text, sizeof(text), "CPU esp: %u%%", (unsigned)(espCpu + 0.5f));
+  lv_label_set_text(gPerfEspLabel, text);
+  snprintf(text, sizeof(text), "RAM: %u%% %uK frag %u%%", (unsigned)mon.used_pct,
+           (unsigned)usedKb, (unsigned)mon.frag_pct);
   lv_label_set_text(gPerfMemLabel, text);
 }
 
@@ -90,13 +99,16 @@ void createPerfOverlay() {
     lv_obj_set_pos(label, 10, y);
     return label;
   };
-  gPerfFpsLabel = make(8);
-  gPerfCpuLabel = make(28);
-  gPerfMemLabel = make(48);
+  gPerfFpsLabel = make(5);
+  gPerfCpuLabel = make(23);
+  gPerfEspLabel = make(41);
+  gPerfMemLabel = make(59);
   lv_label_set_text(gPerfFpsLabel, "FPS: --");
-  lv_label_set_text(gPerfCpuLabel, "CPU: --");
+  lv_label_set_text(gPerfCpuLabel, "CPU host: --");
+  lv_label_set_text(gPerfEspLabel, "CPU esp: --");
   lv_label_set_text(gPerfMemLabel, "RAM: --");
 
+  gPerfFreq = SDL_GetPerformanceFrequency();
   gPerfLastMs = SDL_GetTicks();
   gPerfLastCpu = clock();
   lv_timer_create(perfUpdateCb, 500, nullptr);
@@ -316,10 +328,15 @@ int main(int argc, char** argv) {
     float pt = 0.0f;
     for (int i = 0; i < 60; ++i) {
       const uint32_t frameStart = SDL_GetTicks();
+      const uint64_t renderStart = SDL_GetPerformanceCounter();
       ui::update(demo::make(pt));
       lv_tick_inc(33);
       lv_timer_handler();
-      lv_refr_now(lv_disp_get_default());
+      if (gPerfFreq > 0) {
+        const float ms = (float)(SDL_GetPerformanceCounter() - renderStart) *
+                         1000.0f / (float)gPerfFreq;
+        gRenderMs = gRenderMs * 0.9f + ms * 0.1f;
+      }
       ++gFrameCounter;
       pt += 0.033f;
       const uint32_t frameTime = SDL_GetTicks() - frameStart;
@@ -482,6 +499,7 @@ int main(int argc, char** argv) {
       }
     }
 
+    const uint64_t renderStart = SDL_GetPerformanceCounter();
     ui::update(demo::make(t, gIgnitionOn));
 
     const uint32_t now = SDL_GetTicks();
@@ -489,6 +507,11 @@ int main(int argc, char** argv) {
     lastTick = now;
 
     lv_timer_handler();
+    if (gPerfFreq > 0) {
+      const float ms = (float)(SDL_GetPerformanceCounter() - renderStart) *
+                       1000.0f / (float)gPerfFreq;
+      gRenderMs = gRenderMs * 0.9f + ms * 0.1f;
+    }
     if (gDirty) {
       present();
       gDirty = false;
