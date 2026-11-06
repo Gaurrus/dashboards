@@ -18,6 +18,9 @@ pkg_check_modules(SDL2_APP REQUIRED IMPORTED_TARGET sdl2)
 add_executable(t3dash_sim
   main.cpp
   ../src/ui/lvgl/ui_lvgl.cpp
+  ../src/ui/lvgl/ui_clock.cpp
+  ../src/ui/lvgl/ui_brightness.cpp
+  ../src/ui/lvgl/ui_bye.cpp
   ../assets/vw_gif.c
   ../assets/bye_gif.c
   ../assets/icons.c
