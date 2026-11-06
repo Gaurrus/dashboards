@@ -18,6 +18,7 @@ constexpr uint32_t COL_RED = 0xEF4444;
 constexpr uint32_t COL_GREEN = 0x22C55E;
 constexpr uint32_t COL_DARK_GREEN = 0x15803D;
 constexpr uint32_t COL_YELLOW = 0xEAB308;
+constexpr uint32_t COL_YELLOW_BRIGHT = 0xFFE600;
 constexpr uint32_t COL_BLUE = 0x3B82F6;
 constexpr uint32_t COL_TICK = 0x9CA3AF;
 constexpr uint32_t COL_TURN = 0x2ECC71;

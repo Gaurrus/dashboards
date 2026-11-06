@@ -26,6 +26,8 @@ constexpr float ICON_ORBIT_R = 205.0f;
 constexpr float ICON_ORBIT_START_DEG = -40.0f;
 constexpr float ICON_ORBIT_STEP_DEG = 16.0f;
 
+constexpr int kGaugeTicks = 32;
+
 struct Gauge {
   lv_obj_t* arc = nullptr;
   lv_obj_t* value = nullptr;
@@ -34,6 +36,13 @@ struct Gauge {
   int segmentCount = 0;
   float segmentStep = 0.0f;
   lv_obj_t* segments[80] = {};
+  int tickMarkCount = 0;
+  int litCount = -1;
+  lv_obj_t* tickMarks[kGaugeTicks] = {};
+  lv_obj_t* tickLabels[kGaugeTicks] = {};
+  float tickValues[kGaugeTicks] = {};
+  uint32_t tickColors[kGaugeTicks] = {};
+  uint32_t tickLabelColors[kGaugeTicks] = {};
 };
 
 Gauge g_speed;
@@ -79,10 +88,10 @@ bool g_bootSkipped = false;
 uint32_t g_bootStartMs = 0;
 bool g_selfTestActive = false;
 
-void addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rInner,
-             int rOuter, int width, uint32_t color) {
+lv_obj_t* addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rInner,
+                  int rOuter, int width, uint32_t color) {
   if (g_tickPointCount >= kMaxTicks) {
-    return;
+    return nullptr;
   }
 
   const float rad = angleDeg * 3.14159265f / 180.0f;
@@ -99,6 +108,7 @@ void addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rIn
   lv_obj_set_style_line_width(line, width, 0);
   lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
   lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
+  return line;
 }
 
 uint32_t lerpColor(uint32_t from, uint32_t to, float t) {
@@ -240,24 +250,36 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
     const bool red = redlineFrac > 0.0f && frac >= redlineFrac;
     const uint32_t color = red ? COL_RED : (major ? COL_TICK : COL_DIM);
 
-    addTick(box, size, size / 2, size / 2, angle, rOuter - (major ? 13 : 7), rOuter,
-            major ? 3 : 2, color);
+    lv_obj_t* mark = addTick(box, size, size / 2, size / 2, angle,
+                             rOuter - (major ? 13 : 7), rOuter, major ? 3 : 2, color);
 
-    if (major) {
-      const float rad = angle * 3.14159265f / 180.0f;
-      const int rLabel = rOuter - 24;
-      const int dx = (int)(cosf(rad) * rLabel);
-      const int dy = (int)(sinf(rad) * rLabel);
+    const int markIndex = g.tickMarkCount;
+    if (mark != nullptr && markIndex < kGaugeTicks) {
+      g.tickMarks[markIndex] = mark;
+      g.tickValues[markIndex] = tickValue;
+      g.tickColors[markIndex] = color;
+      g.tickLabels[markIndex] = nullptr;
+      g.tickLabelColors[markIndex] = red ? COL_RED : COL_DIM;
 
-      char text[16];
-      if (div1000) {
-        snprintf(text, sizeof(text), "%d", (int)(tickValue / 1000.0f + 0.5f));
-      } else {
-        snprintf(text, sizeof(text), "%d", (int)(tickValue + 0.5f));
+      if (major) {
+        const float rad = angle * 3.14159265f / 180.0f;
+        const int rLabel = rOuter - 24;
+        const int dx = (int)(cosf(rad) * rLabel);
+        const int dy = (int)(sinf(rad) * rLabel);
+
+        char text[16];
+        if (div1000) {
+          snprintf(text, sizeof(text), "%d", (int)(tickValue / 1000.0f + 0.5f));
+        } else {
+          snprintf(text, sizeof(text), "%d", (int)(tickValue + 0.5f));
+        }
+        lv_obj_t* tick = makeLabel(box, text, &lv_font_montserrat_14,
+                                   red ? COL_RED : COL_DIM);
+        lv_obj_align(tick, LV_ALIGN_CENTER, dx, dy);
+        g.tickLabels[markIndex] = tick;
       }
-      lv_obj_t* tick = makeLabel(box, text, &lv_font_montserrat_14,
-                                 red ? COL_RED : COL_DIM);
-      lv_obj_align(tick, LV_ALIGN_CENTER, dx, dy);
+
+      g.tickMarkCount = markIndex + 1;
     }
   }
 
@@ -278,7 +300,8 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
   return g;
 }
 
-void updateGauge(Gauge& g, float value, bool valid, uint32_t accent) {
+void updateGauge(Gauge& g, float value, bool valid, uint32_t accent,
+                 bool highlightReached = false) {
   int32_t arcValue = valid ? (int32_t)(value + 0.5f) : 0;
   if (arcValue < 0) {
     arcValue = 0;
@@ -308,6 +331,27 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent) {
     lv_arc_set_value(g.arc, arcValue);
     lv_obj_set_style_arc_color(g.arc, lv_color_hex(valid ? accent : COL_TRACK),
                                LV_PART_INDICATOR);
+  }
+
+  if (highlightReached && g.tickMarkCount > 0) {
+    int lit = 0;
+    if (valid) {
+      while (lit < g.tickMarkCount && g.tickValues[lit] <= value + 0.5f) {
+        ++lit;
+      }
+    }
+    if (lit != g.litCount) {
+      g.litCount = lit;
+      for (int i = 0; i < g.tickMarkCount; ++i) {
+        const bool on = i < lit;
+        const uint32_t markColor = on ? COL_YELLOW_BRIGHT : g.tickColors[i];
+        lv_obj_set_style_line_color(g.tickMarks[i], lv_color_hex(markColor), 0);
+        if (g.tickLabels[i] != nullptr) {
+          const uint32_t labelColor = on ? COL_YELLOW_BRIGHT : g.tickLabelColors[i];
+          lv_obj_set_style_text_color(g.tickLabels[i], lv_color_hex(labelColor), 0);
+        }
+      }
+    }
   }
 
   char text[24];
@@ -610,7 +654,7 @@ lv_obj_t* createSplash(lv_obj_t* parent) {
 }
 
 void applyValues(const Values& v) {
-  updateGauge(g_speed, v.speedKmh, v.speedValid, g_speedArcColor);
+  updateGauge(g_speed, v.speedKmh, v.speedValid, g_speedArcColor, true);
   updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
 
   updateTempBar(v);
