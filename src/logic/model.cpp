@@ -42,6 +42,8 @@ void DashboardModel::update(const RawInputs& raw, float dt) {
   v_.turnLeft = raw.turnLeft;
   v_.turnRight = raw.turnRight;
   v_.glowPlug = raw.glowPlug;
+  v_.parkingBrake = raw.parkingBrake;
+  v_.brakeFault = raw.brakeFault;
 
   v_.tempWarning = v_.coolantValid && v_.coolantC >= cfg::TEMP_WARN_C;
   v_.fuelWarning = v_.fuelValid && v_.fuelPct <= cfg::FUEL_WARN_PCT;

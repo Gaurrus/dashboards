@@ -12,6 +12,8 @@ constexpr int PIN_ADC_FUEL  = 39;
 constexpr int PIN_BTN_OIL    = 25;
 constexpr int PIN_BTN_BEAM   = 26;
 constexpr int PIN_BTN_TURN_L = 27;
+constexpr int PIN_BTN_BRAKE  = 5;   // Wokwi: parking brake switch
+constexpr int PIN_BTN_BRAKE_FAULT = 13;  // Wokwi: low fluid / circuit failure
 
 // Shared between simulation and real board.
 constexpr int PIN_BUZZER = 33;
@@ -31,6 +33,13 @@ constexpr int PIN_LOW_BEAM = 5;
 constexpr int PIN_TURN_L  = 13;
 constexpr int PIN_TURN_R  = 14;
 constexpr int PIN_GLOW    = 12;  // diesel glow plug indicator (active-low via optocoupler)
+
+// Brake inputs: separate contacts so the UI can tell the parking brake from a
+// brake fault (low fluid / failed circuit). Both are make-to-ground switches:
+// feed them through PC817 optocouplers (1k/2W + reverse diode), active-low.
+// GPIO36/39 are input-only: add an external 10k pull-up to 3.3V.
+constexpr int PIN_BRAKE       = 39;  // handbrake switch
+constexpr int PIN_BRAKE_FAULT = 36;  // brake fluid level / pressure differential switch
 
 constexpr int I2C_SDA = 21;
 constexpr int I2C_SCL = 22;

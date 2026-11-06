@@ -15,11 +15,17 @@
 //   A2 <- fuel sender node (sender to GND, 150R to excitation)
 //   A3 <- excitation rail (3.3V) for ratiometric resistance math
 //
-// PC817 optocouplers for 12V inputs (RPM, oil, charge, beam, turns):
+// PC817 optocouplers for 12V inputs (RPM, oil, charge, beam, turns, glow,
+// handbrake, brake fault):
 //   emitter -> GND, collector -> GPIO, 12V via 1k/2W + reverse diode.
 //   Active input pulls the GPIO LOW.
-//   NOTE: GPIO34..39 have NO internal pull-ups, so the RPM collector needs an
-//   external 10k resistor to 3.3V. The other inputs use INPUT_PULLUP.
+//   NOTE: GPIO34..39 have NO internal pull-ups, so the RPM, ignition and brake
+//   collectors need an external 10k resistor to 3.3V. The other inputs use
+//   INPUT_PULLUP.
+// Brake inputs are make-to-ground switches (handbrake lever, reservoir float,
+// pressure differential). Feed each one through its own opto channel:
+//   +12V -> 1k -> LED anode, LED cathode -> switch line -> GND when active.
+// This keeps the factory BRAKE lamp working; the ESP32 only monitors it.
 // RPM from the ignition coil needs extra protection: 10k/2W + 1N4007 + 15V zener.
 //
 // GPS: NEO-6M / ATGM336H TX -> ESP32 GPIO16 (RX2), 9600 baud.
@@ -67,6 +73,8 @@ void Hal::begin() {
   // Input-only pins: rely on external 10k pull-ups to 3.3V.
   pinMode(cfg::PIN_RPM_IN, INPUT);
   pinMode(cfg::PIN_IGNITION, INPUT);
+  pinMode(cfg::PIN_BRAKE, INPUT);
+  pinMode(cfg::PIN_BRAKE_FAULT, INPUT);
   attachInterrupt(digitalPinToInterrupt(cfg::PIN_RPM_IN), onRpmPulse, FALLING);
 
   pinMode(cfg::PIN_BUZZER, OUTPUT);
@@ -141,6 +149,8 @@ void Hal::poll(RawInputs& out) {
   out.turnLeft = digitalRead(cfg::PIN_TURN_L) == LOW;
   out.turnRight = digitalRead(cfg::PIN_TURN_R) == LOW;
   out.glowPlug = digitalRead(cfg::PIN_GLOW) == LOW;
+  out.parkingBrake = digitalRead(cfg::PIN_BRAKE) == LOW;
+  out.brakeFault = digitalRead(cfg::PIN_BRAKE_FAULT) == LOW;
 
   // --- GPS speed ---
   while (gpsSerial.available() > 0) {

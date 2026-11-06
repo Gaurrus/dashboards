@@ -1,29 +1,20 @@
 #include "ui_lvgl.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
-#include <ctime>
 
-#include "bye_gif.h"
 #include "icons.h"
 #include "lvgl.h"
+#include "ui_brightness.h"
+#include "ui_bye.h"
+#include "ui_clock.h"
+#include "ui_theme.h"
 #include "vw_gif.h"
 
-namespace {
+using namespace ui::theme;
 
-constexpr uint32_t COL_BG = 0x0B0E11;
-constexpr uint32_t COL_TRACK = 0x2A2F35;
-constexpr uint32_t COL_TEXT = 0xE6E6E6;
-constexpr uint32_t COL_DIM = 0x6B7280;
-constexpr uint32_t COL_CYAN = 0x22D3EE;
-constexpr uint32_t COL_ORANGE = 0xF59E0B;
-constexpr uint32_t COL_RED = 0xEF4444;
-constexpr uint32_t COL_GREEN = 0x22C55E;
-constexpr uint32_t COL_DARK_GREEN = 0x15803D;
-constexpr uint32_t COL_YELLOW = 0xEAB308;
-constexpr uint32_t COL_BLUE = 0x3B82F6;
-constexpr uint32_t COL_TICK = 0x9CA3AF;
-constexpr uint32_t COL_TURN = 0x2ECC71;
+namespace {
 
 constexpr int SIDE_SIZE = 210;
 constexpr int SPEED_SIZE = 315;
@@ -34,8 +25,8 @@ constexpr float SPEED_CY = 75.0f + SPEED_SIZE / 2.0f;
 constexpr float ICON_ORBIT_R = 205.0f;
 constexpr float ICON_ORBIT_START_DEG = -40.0f;
 constexpr float ICON_ORBIT_STEP_DEG = 16.0f;
-constexpr int STATUS_ICON_SIZE = 30;
-constexpr int CLOCK_SIZE = 210;
+
+constexpr int kGaugeTicks = 32;
 
 struct Gauge {
   lv_obj_t* arc = nullptr;
@@ -45,6 +36,13 @@ struct Gauge {
   int segmentCount = 0;
   float segmentStep = 0.0f;
   lv_obj_t* segments[80] = {};
+  int tickMarkCount = 0;
+  int litCount = -1;
+  lv_obj_t* tickMarks[kGaugeTicks] = {};
+  lv_obj_t* tickLabels[kGaugeTicks] = {};
+  float tickValues[kGaugeTicks] = {};
+  uint32_t tickColors[kGaugeTicks] = {};
+  uint32_t tickLabelColors[kGaugeTicks] = {};
 };
 
 Gauge g_speed;
@@ -73,22 +71,9 @@ lv_obj_t* g_iconBeam = nullptr;
 lv_obj_t* g_iconLowBeam = nullptr;
 lv_obj_t* g_iconFog = nullptr;
 lv_obj_t* g_iconBrake = nullptr;
+lv_obj_t* g_iconBrakeFault = nullptr;
 lv_obj_t* g_turnLeft = nullptr;
 lv_obj_t* g_turnRight = nullptr;
-
-lv_obj_t* g_clockTime = nullptr;
-uint32_t g_clockSeconds = 0;
-uint32_t g_clockLastTick = 0;
-bool g_clockChanged = false;
-lv_obj_t* g_clockSet = nullptr;
-lv_obj_t* g_clockHourRoller = nullptr;
-lv_obj_t* g_clockMinuteRoller = nullptr;
-lv_obj_t* g_hourLine = nullptr;
-lv_obj_t* g_minuteLine = nullptr;
-lv_obj_t* g_secondLine = nullptr;
-lv_point_t g_hourHand[2];
-lv_point_t g_minuteHand[2];
-lv_point_t g_secondHand[2];
 
 constexpr uint32_t BOOT_SPLASH_MS = 1800;
 constexpr uint32_t BOOT_UP_MS = 900;
@@ -97,10 +82,6 @@ constexpr uint32_t BOOT_DOWN_MS = 1000;
 constexpr uint32_t BOOT_TOTAL_MS =
     BOOT_SPLASH_MS + BOOT_UP_MS + BOOT_HOLD_MS + BOOT_DOWN_MS;
 
-constexpr uint32_t BYE_FADE_IN_MS = 350;
-constexpr uint32_t BYE_HOLD_MS = 2200;
-constexpr uint32_t BYE_FADE_OUT_MS = 700;
-
 lv_obj_t* g_splash = nullptr;
 lv_obj_t* g_splashGif = nullptr;
 bool g_bootStarted = false;
@@ -108,49 +89,10 @@ bool g_bootSkipped = false;
 uint32_t g_bootStartMs = 0;
 bool g_selfTestActive = false;
 
-lv_obj_t* g_bye = nullptr;
-lv_obj_t* g_byeGif = nullptr;
-lv_obj_t* g_byeContent = nullptr;
-bool g_ignitionOff = false;
-bool g_byeFadingOut = false;
-uint32_t g_ignitionOffMs = 0;
-
-// Brightness is emulated with a black overlay: the Waveshare 7" backlight is
-// wired to a switch-only IO expander pin and cannot be PWM-dimmed.
-constexpr int BRIGHTNESS_SWIPE_ZONE_WIDTH = 100;
-constexpr float BRIGHTNESS_SWIPE_RANGE_FRAC = 0.8f;
-constexpr uint32_t BRIGHTNESS_INDICATOR_HIDE_MS = 1200;
-constexpr int BRIGHTNESS_TRACK_WIDTH = 12;
-constexpr int BRIGHTNESS_TRACK_HEIGHT = 150;
-
-lv_obj_t* g_dimmer = nullptr;
-lv_obj_t* g_brightnessZone = nullptr;
-lv_obj_t* g_brightnessIndicator = nullptr;
-lv_obj_t* g_brightnessValueLabel = nullptr;
-lv_obj_t* g_brightnessTrack = nullptr;
-lv_obj_t* g_brightnessFill = nullptr;
-lv_timer_t* g_brightnessHideTimer = nullptr;
-
-int g_brightness = 100;
-int g_brightnessStartValue = 100;
-lv_coord_t g_brightnessStartY = 0;
-bool g_brightnessDragging = false;
-uint32_t g_brightnessShownMs = 0;
-
-lv_obj_t* makeLabel(lv_obj_t* parent, const char* text, const lv_font_t* font,
-                    uint32_t color) {
-  lv_obj_t* label = lv_label_create(parent);
-  lv_label_set_text(label, text);
-  lv_obj_set_style_text_font(label, font, 0);
-  lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
-  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-  return label;
-}
-
-void addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rInner,
-             int rOuter, int width, uint32_t color) {
+lv_obj_t* addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rInner,
+                  int rOuter, int width, uint32_t color) {
   if (g_tickPointCount >= kMaxTicks) {
-    return;
+    return nullptr;
   }
 
   const float rad = angleDeg * 3.14159265f / 180.0f;
@@ -167,6 +109,7 @@ void addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rIn
   lv_obj_set_style_line_width(line, width, 0);
   lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
   lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
+  return line;
 }
 
 uint32_t lerpColor(uint32_t from, uint32_t to, float t) {
@@ -308,24 +251,36 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
     const bool red = redlineFrac > 0.0f && frac >= redlineFrac;
     const uint32_t color = red ? COL_RED : (major ? COL_TICK : COL_DIM);
 
-    addTick(box, size, size / 2, size / 2, angle, rOuter - (major ? 13 : 7), rOuter,
-            major ? 3 : 2, color);
+    lv_obj_t* mark = addTick(box, size, size / 2, size / 2, angle,
+                             rOuter - (major ? 13 : 7), rOuter, major ? 3 : 2, color);
 
-    if (major) {
-      const float rad = angle * 3.14159265f / 180.0f;
-      const int rLabel = rOuter - 24;
-      const int dx = (int)(cosf(rad) * rLabel);
-      const int dy = (int)(sinf(rad) * rLabel);
+    const int markIndex = g.tickMarkCount;
+    if (mark != nullptr && markIndex < kGaugeTicks) {
+      g.tickMarks[markIndex] = mark;
+      g.tickValues[markIndex] = tickValue;
+      g.tickColors[markIndex] = color;
+      g.tickLabels[markIndex] = nullptr;
+      g.tickLabelColors[markIndex] = red ? COL_RED : COL_DIM;
 
-      char text[16];
-      if (div1000) {
-        snprintf(text, sizeof(text), "%d", (int)(tickValue / 1000.0f + 0.5f));
-      } else {
-        snprintf(text, sizeof(text), "%d", (int)(tickValue + 0.5f));
+      if (major) {
+        const float rad = angle * 3.14159265f / 180.0f;
+        const int rLabel = rOuter - 24;
+        const int dx = (int)(cosf(rad) * rLabel);
+        const int dy = (int)(sinf(rad) * rLabel);
+
+        char text[16];
+        if (div1000) {
+          snprintf(text, sizeof(text), "%d", (int)(tickValue / 1000.0f + 0.5f));
+        } else {
+          snprintf(text, sizeof(text), "%d", (int)(tickValue + 0.5f));
+        }
+        lv_obj_t* tick = makeLabel(box, text, &lv_font_montserrat_14,
+                                   red ? COL_RED : COL_DIM);
+        lv_obj_align(tick, LV_ALIGN_CENTER, dx, dy);
+        g.tickLabels[markIndex] = tick;
       }
-      lv_obj_t* tick = makeLabel(box, text, &lv_font_montserrat_14,
-                                 red ? COL_RED : COL_DIM);
-      lv_obj_align(tick, LV_ALIGN_CENTER, dx, dy);
+
+      g.tickMarkCount = markIndex + 1;
     }
   }
 
@@ -346,109 +301,8 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
   return g;
 }
 
-void clockTapCb(lv_event_t* e);
-
-void setHandPoints(lv_point_t* points, int size, float angleDeg, int length) {
-  const float rad = angleDeg * 3.14159265f / 180.0f;
-  const int center = size / 2;
-  points[0].x = center;
-  points[0].y = center;
-  points[1].x = center + (lv_coord_t)(sinf(rad) * length);
-  points[1].y = center - (lv_coord_t)(cosf(rad) * length);
-}
-
-void createClock(lv_obj_t* parent, int x, int y, int size) {
-  lv_obj_t* box = lv_obj_create(parent);
-  lv_obj_remove_style_all(box);
-  lv_obj_set_size(box, size, size);
-  lv_obj_set_pos(box, x, y);
-  lv_obj_set_style_bg_opa(box, LV_OPA_TRANSP, 0);
-  lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(box, clockTapCb, LV_EVENT_CLICKED, nullptr);
-
-  lv_obj_t* ring = lv_obj_create(box);
-  lv_obj_remove_style_all(ring);
-  lv_obj_set_size(ring, size - 4, size - 4);
-  lv_obj_center(ring);
-  lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_border_width(ring, 6, 0);
-  lv_obj_set_style_border_color(ring, lv_color_hex(COL_TRACK), 0);
-  lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
-  lv_obj_clear_flag(ring, LV_OBJ_FLAG_CLICKABLE);
-
-  const int dotRadius = size / 2 - 18;
-  for (int i = 0; i < 12; ++i) {
-    const float rad = (i * 30.0f) * 3.14159265f / 180.0f;
-    const int dx = (int)(cosf(rad) * dotRadius);
-    const int dy = (int)(sinf(rad) * dotRadius);
-
-    lv_obj_t* dot = lv_obj_create(box);
-    lv_obj_remove_style_all(dot);
-    lv_obj_set_size(dot, (i % 3 == 0) ? 8 : 5, (i % 3 == 0) ? 8 : 5);
-    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(dot, lv_color_hex(COL_DIM), 0);
-    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-    lv_obj_align(dot, LV_ALIGN_CENTER, dx, dy);
-  }
-
-  // Digital block below the centre.
-  lv_obj_t* panel = lv_obj_create(box);
-  lv_obj_set_size(panel, 108, 38);
-  lv_obj_align(panel, LV_ALIGN_CENTER, 0, 50);
-  lv_obj_set_style_bg_color(panel, lv_color_hex(0x11161B), 0);
-  lv_obj_set_style_bg_opa(panel, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_radius(panel, 6, 0);
-  lv_obj_set_style_border_width(panel, 1, 0);
-  lv_obj_set_style_border_color(panel, lv_color_hex(COL_TRACK), 0);
-  lv_obj_set_style_pad_all(panel, 0, 0);
-  lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(panel, LV_OBJ_FLAG_CLICKABLE);
-
-  g_clockTime = makeLabel(panel, "--:--", &lv_font_montserrat_24, COL_TEXT);
-  lv_obj_align(g_clockTime, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_bg_color(g_clockTime, lv_color_hex(0x11161B), 0);
-  lv_obj_set_style_bg_opa(g_clockTime, LV_OPA_COVER, 0);
-  lv_obj_set_style_pad_hor(g_clockTime, 4, 0);
-  lv_obj_set_style_pad_ver(g_clockTime, 1, 0);
-
-  auto createHand = [&](uint32_t color, int width) {
-    lv_obj_t* line = lv_line_create(box);
-    lv_obj_set_size(line, size, size);
-    lv_obj_set_pos(line, 0, 0);
-    lv_obj_set_style_line_width(line, width, 0);
-    lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
-    lv_obj_set_style_line_rounded(line, true, 0);
-    lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(line, LV_OBJ_FLAG_HIDDEN);
-    return line;
-  };
-
-  g_hourLine = createHand(COL_TEXT, 5);
-  g_minuteLine = createHand(COL_TEXT, 3);
-  g_secondLine = createHand(COL_ORANGE, 2);
-
-  setHandPoints(g_hourHand, size, 0.0f, 42);
-  setHandPoints(g_minuteHand, size, 0.0f, 62);
-  setHandPoints(g_secondHand, size, 0.0f, 72);
-  lv_line_set_points(g_hourLine, g_hourHand, 2);
-  lv_line_set_points(g_minuteLine, g_minuteHand, 2);
-  lv_line_set_points(g_secondLine, g_secondHand, 2);
-
-  // Keep the digital block above the hands so it is always readable.
-  lv_obj_move_foreground(panel);
-
-  lv_obj_t* hub = lv_obj_create(box);
-  lv_obj_remove_style_all(hub);
-  lv_obj_set_size(hub, 10, 10);
-  lv_obj_set_style_radius(hub, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(hub, lv_color_hex(COL_TEXT), 0);
-  lv_obj_set_style_bg_opa(hub, LV_OPA_COVER, 0);
-  lv_obj_align(hub, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_clear_flag(hub, LV_OBJ_FLAG_CLICKABLE);
-}
-
-void updateGauge(Gauge& g, float value, bool valid, uint32_t accent) {
+void updateGauge(Gauge& g, float value, bool valid, uint32_t accent,
+                 bool highlightReached = false) {
   int32_t arcValue = valid ? (int32_t)(value + 0.5f) : 0;
   if (arcValue < 0) {
     arcValue = 0;
@@ -480,6 +334,27 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent) {
                                LV_PART_INDICATOR);
   }
 
+  if (highlightReached && g.tickMarkCount > 0) {
+    int lit = 0;
+    if (valid) {
+      while (lit < g.tickMarkCount && g.tickValues[lit] <= value + 0.5f) {
+        ++lit;
+      }
+    }
+    if (lit != g.litCount) {
+      g.litCount = lit;
+      for (int i = 0; i < g.tickMarkCount; ++i) {
+        const bool on = i < lit;
+        const uint32_t markColor = on ? COL_YELLOW_BRIGHT : g.tickColors[i];
+        lv_obj_set_style_line_color(g.tickMarks[i], lv_color_hex(markColor), 0);
+        if (g.tickLabels[i] != nullptr) {
+          const uint32_t labelColor = on ? COL_YELLOW_BRIGHT : g.tickLabelColors[i];
+          lv_obj_set_style_text_color(g.tickLabels[i], lv_color_hex(labelColor), 0);
+        }
+      }
+    }
+  }
+
   char text[24];
   if (!valid) {
     snprintf(text, sizeof(text), "--");
@@ -495,33 +370,28 @@ void setIconState(lv_obj_t* icon, bool on) {
   lv_obj_set_style_img_opa(icon, on ? LV_OPA_COVER : LV_OPA_20, 0);
 }
 
-lv_obj_t* createStatusIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y,
-                           uint32_t color) {
+lv_obj_t* createStatusIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y) {
   lv_obj_t* icon = lv_img_create(parent);
   lv_img_set_src(icon, src);
   lv_obj_set_pos(icon, x, y);
-  lv_obj_set_style_img_recolor(icon, lv_color_hex(color), 0);
-  lv_obj_set_style_img_recolor_opa(icon, LV_OPA_COVER, 0);
   lv_obj_set_style_img_opa(icon, LV_OPA_20, 0);
   return icon;
 }
 
-lv_obj_t* createOrbitIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int index,
-                          uint32_t color) {
+lv_obj_t* createOrbitIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int index) {
   const float deg = ICON_ORBIT_START_DEG + ICON_ORBIT_STEP_DEG * index;
   const float rad = deg * 3.14159265f / 180.0f;
   const int cx = (int)(SPEED_CX + ICON_ORBIT_R * sinf(rad) + 0.5f);
   const int cy = (int)(SPEED_CY - ICON_ORBIT_R * cosf(rad) + 0.5f);
-  return createStatusIcon(parent, src, cx - STATUS_ICON_SIZE / 2,
-                          cy - STATUS_ICON_SIZE / 2, color);
+  const int iw = (int)src->header.w;
+  const int ih = (int)src->header.h;
+  return createStatusIcon(parent, src, cx - iw / 2, cy - ih / 2);
 }
 
 lv_obj_t* createTurnArrow(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y) {
   lv_obj_t* arrow = lv_img_create(parent);
   lv_img_set_src(arrow, src);
   lv_obj_set_pos(arrow, x, y);
-  lv_obj_set_style_img_recolor(arrow, lv_color_hex(COL_TURN), 0);
-  lv_obj_set_style_img_recolor_opa(arrow, LV_OPA_COVER, 0);
   lv_obj_add_flag(arrow, LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(arrow, LV_OBJ_FLAG_CLICKABLE);
   return arrow;
@@ -604,18 +474,165 @@ void updateFuelBar(const Values& v) {
   lv_obj_set_size(g_fuelCover, 210 - filled, 16);
 }
 
-void updateClock();
-void showClockSettings();
-void hideClockSettings();
-
 void clockTapCb(lv_event_t* /*e*/) {
-  if (g_ignitionOff || !g_bootStarted) {
+  if (ui::internal::byeActive()) {
+    return;
+  }
+  if (!g_bootStarted) {
     return;
   }
   if (!g_bootSkipped && lv_tick_elaps(g_bootStartMs) < BOOT_TOTAL_MS) {
     return;
   }
-  showClockSettings();
+  ui::internal::clockShowSettings();
+}
+
+// --- Speedometer arc color: hold 3 s inside the dial circle for the menu. ---
+constexpr uint32_t kArcColors[] = {
+    COL_CYAN,   COL_GREEN, COL_ORANGE, COL_YELLOW,
+    COL_BLUE,   COL_RED,   COL_TEXT,   0xA855F7,
+};
+constexpr int kArcColorCount = 8;
+constexpr uint32_t kDialHoldMs = 3000;
+constexpr float kDialCenterX = 399.5f;
+constexpr float kDialCenterY = 232.5f;
+constexpr float kDialRadius = 155.0f;
+
+lv_obj_t* g_colorMenu = nullptr;
+lv_obj_t* g_colorSwatches[kArcColorCount] = {};
+uint32_t g_speedArcColor = COL_CYAN;
+int g_speedArcIndex = 0;
+bool g_dialPressActive = false;
+bool g_colorMenuOpenedForPress = false;
+uint32_t g_dialPressMs = 0;
+
+bool pointInDial(const lv_point_t& p) {
+  const float dx = (float)p.x - kDialCenterX;
+  const float dy = (float)p.y - kDialCenterY;
+  return dx * dx + dy * dy <= kDialRadius * kDialRadius;
+}
+
+void setSpeedArcColor(uint32_t color, int index) {
+  g_speedArcColor = color;
+  g_speedArcIndex = index;
+  if (g_speed.value != nullptr) {
+    lv_obj_set_style_text_color(g_speed.value, lv_color_hex(color), 0);
+  }
+  for (int i = 0; i < kArcColorCount; ++i) {
+    if (g_colorSwatches[i] == nullptr) {
+      continue;
+    }
+    const bool selected = (i == index);
+    lv_obj_set_style_border_width(g_colorSwatches[i], selected ? 3 : 1, 0);
+    lv_obj_set_style_border_color(
+        g_colorSwatches[i], lv_color_hex(selected ? COL_TEXT : COL_TRACK), 0);
+  }
+}
+
+void colorMenuShow() {
+  if (g_colorMenu == nullptr) {
+    return;
+  }
+  lv_obj_clear_flag(g_colorMenu, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(g_colorMenu);
+}
+
+void colorMenuHide() {
+  if (g_colorMenu != nullptr) {
+    lv_obj_add_flag(g_colorMenu, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+void colorSwatchCb(lv_event_t* e) {
+  const int index = (int)(intptr_t)lv_event_get_user_data(e);
+  if (index >= 0 && index < kArcColorCount) {
+    setSpeedArcColor(kArcColors[index], index);
+  }
+  colorMenuHide();
+}
+
+void colorBackdropCb(lv_event_t* /*e*/) {
+  colorMenuHide();
+}
+
+void gaugeTapCb(lv_event_t* e) {
+  const lv_event_code_t code = lv_event_get_code(e);
+  lv_indev_t* indev = lv_indev_get_act();
+  lv_point_t p{0, 0};
+  if (indev != nullptr) {
+    lv_indev_get_point(indev, &p);
+  }
+
+  if (code == LV_EVENT_PRESSED) {
+    g_dialPressActive = false;
+    g_colorMenuOpenedForPress = false;
+    if (pointInDial(p)) {
+      g_dialPressActive = true;
+      g_dialPressMs = lv_tick_get();
+    }
+  } else if (code == LV_EVENT_PRESSING) {
+    if (!g_dialPressActive || g_colorMenuOpenedForPress) {
+      return;
+    }
+    if (!pointInDial(p)) {
+      g_dialPressActive = false;
+      return;
+    }
+    if (lv_tick_elaps(g_dialPressMs) >= kDialHoldMs) {
+      colorMenuShow();
+      g_colorMenuOpenedForPress = true;
+    }
+  } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+    g_dialPressActive = false;
+  }
+}
+
+lv_obj_t* createColorMenu() {
+  lv_obj_t* backdrop = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(backdrop);
+  lv_obj_set_size(backdrop, LV_HOR_RES, LV_VER_RES);
+  lv_obj_set_pos(backdrop, 0, 0);
+  lv_obj_set_style_bg_color(backdrop, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(backdrop, (lv_opa_t)170, 0);
+  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(backdrop, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(backdrop, colorBackdropCb, LV_EVENT_CLICKED, nullptr);
+  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_HIDDEN);
+
+  lv_obj_t* panel = lv_obj_create(backdrop);
+  lv_obj_remove_style_all(panel);
+  lv_obj_set_size(panel, 440, 300);
+  lv_obj_center(panel);
+  lv_obj_set_style_bg_color(panel, lv_color_hex(0x141A20), 0);
+  lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(panel, 16, 0);
+  lv_obj_set_style_border_width(panel, 1, 0);
+  lv_obj_set_style_border_color(panel, lv_color_hex(COL_TRACK), 0);
+  lv_obj_add_flag(panel, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t* title = makeLabel(panel, "ARC COLOR", &lv_font_montserrat_24, COL_TEXT);
+  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
+
+  for (int i = 0; i < kArcColorCount; ++i) {
+    const int col = i % 4;
+    const int row = i / 4;
+    lv_obj_t* swatch = lv_btn_create(panel);
+    lv_obj_set_size(swatch, 70, 70);
+    lv_obj_set_pos(swatch, 59 + col * 84, 84 + row * 84);
+    lv_obj_set_style_bg_color(swatch, lv_color_hex(kArcColors[i]), 0);
+    lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(swatch, 12, 0);
+    lv_obj_set_style_border_width(swatch, 1, 0);
+    lv_obj_set_style_border_color(swatch, lv_color_hex(COL_TRACK), 0);
+    lv_obj_clear_flag(swatch, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(swatch, colorSwatchCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    g_colorSwatches[i] = swatch;
+  }
+
+  lv_obj_move_foreground(backdrop);
+  setSpeedArcColor(g_speedArcColor, g_speedArcIndex);
+  return backdrop;
 }
 
 lv_obj_t* createSplash(lv_obj_t* parent) {
@@ -637,85 +654,8 @@ lv_obj_t* createSplash(lv_obj_t* parent) {
   return splash;
 }
 
-void byeContentOpaAnimCb(void* var, int32_t value) {
-  lv_obj_set_style_opa((lv_obj_t*)var, (lv_opa_t)value, 0);
-}
-
-lv_obj_t* createByeScreen(lv_obj_t* parent) {
-  lv_obj_t* bye = lv_obj_create(parent);
-  lv_obj_remove_style_all(bye);
-  lv_obj_set_size(bye, LV_HOR_RES, LV_VER_RES);
-  lv_obj_set_pos(bye, 0, 0);
-  lv_obj_set_style_bg_color(bye, lv_color_black(), 0);
-  lv_obj_set_style_bg_opa(bye, LV_OPA_COVER, 0);
-  lv_obj_clear_flag(bye, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(bye, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_flag(bye, LV_OBJ_FLAG_HIDDEN);
-
-  g_byeContent = lv_obj_create(bye);
-  lv_obj_remove_style_all(g_byeContent);
-  lv_obj_set_size(g_byeContent, LV_HOR_RES, LV_VER_RES);
-  lv_obj_set_pos(g_byeContent, 0, 0);
-  lv_obj_set_style_bg_opa(g_byeContent, LV_OPA_TRANSP, 0);
-  lv_obj_clear_flag(g_byeContent, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(g_byeContent, LV_OBJ_FLAG_CLICKABLE);
-
-  lv_obj_t* gif = lv_gif_create(g_byeContent);
-  lv_gif_set_src(gif, &bye_gif);
-  lv_obj_align(gif, LV_ALIGN_CENTER, 0, 0);
-  g_byeGif = gif;
-  lv_timer_pause(((lv_gif_t*)gif)->timer);
-
-  lv_obj_t* label =
-      makeLabel(g_byeContent, "Transporter", &lv_font_montserrat_32, COL_TEXT);
-  lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, -16);
-
-  lv_obj_move_foreground(bye);
-  return bye;
-}
-
-void showByeScreen() {
-  hideClockSettings();
-  g_ignitionOff = true;
-  g_byeFadingOut = false;
-  g_ignitionOffMs = lv_tick_get();
-
-  if (g_byeContent != nullptr) {
-    lv_anim_del(g_byeContent, byeContentOpaAnimCb);
-    lv_obj_set_style_opa(g_byeContent, LV_OPA_TRANSP, 0);
-
-    lv_anim_t anim;
-    lv_anim_init(&anim);
-    lv_anim_set_var(&anim, g_byeContent);
-    lv_anim_set_values(&anim, LV_OPA_TRANSP, LV_OPA_COVER);
-    lv_anim_set_time(&anim, BYE_FADE_IN_MS);
-    lv_anim_set_exec_cb(&anim, byeContentOpaAnimCb);
-    lv_anim_start(&anim);
-  }
-
-  lv_obj_clear_flag(g_bye, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_move_foreground(g_bye);
-
-  if (g_byeGif != nullptr) {
-    lv_gif_restart(g_byeGif);
-  }
-}
-
-void hideByeScreen() {
-  g_ignitionOff = false;
-  g_byeFadingOut = false;
-  if (g_byeContent != nullptr) {
-    lv_anim_del(g_byeContent, byeContentOpaAnimCb);
-    lv_obj_set_style_opa(g_byeContent, LV_OPA_COVER, 0);
-  }
-  lv_obj_add_flag(g_bye, LV_OBJ_FLAG_HIDDEN);
-  if (g_byeGif != nullptr) {
-    lv_timer_pause(((lv_gif_t*)g_byeGif)->timer);
-  }
-}
-
 void applyValues(const Values& v) {
-  updateGauge(g_speed, v.speedKmh, v.speedValid, COL_CYAN);
+  updateGauge(g_speed, v.speedKmh, v.speedValid, g_speedArcColor, true);
   updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
 
   updateTempBar(v);
@@ -741,7 +681,15 @@ void applyValues(const Values& v) {
   setIconState(g_iconChg, v.chargeWarning);
   setIconState(g_iconGlow, v.glowPlug);
   setIconState(g_iconFog, v.fogLight);
-  setIconState(g_iconBrake, v.parkingBrake);
+
+  // Parking brake and brake fault share one orbit slot. A fault wins; if both
+  // are active, alternate so neither condition is hidden.
+  bool showBrakeFault = v.brakeFault;
+  if (v.brakeFault && v.parkingBrake && !g_selfTestActive) {
+    showBrakeFault = ((lv_tick_get() / 700U) & 1U) == 0U;
+  }
+  setIconState(g_iconBrake, v.parkingBrake && !showBrakeFault);
+  setIconState(g_iconBrakeFault, showBrakeFault);
 
   if (v.highBeam) {
     lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_0, 0);
@@ -758,336 +706,7 @@ void applyValues(const Values& v) {
   setBlinking(g_turnLeft, v.turnLeft, blinkOn);
   setBlinking(g_turnRight, v.turnRight, blinkOn);
 
-  updateClock();
-}
-
-void advanceClock() {
-  const uint32_t now = lv_tick_get();
-  const uint32_t elapsed = now - g_clockLastTick;
-  if (elapsed >= 1000U) {
-    g_clockSeconds = (g_clockSeconds + elapsed / 1000U) % 86400U;
-    g_clockLastTick += (elapsed / 1000U) * 1000U;
-  }
-}
-
-void updateClock() {
-  static uint32_t lastSecond = 0xFFFFFFFFU;
-
-  advanceClock();
-  if (g_clockSeconds == lastSecond) {
-    return;
-  }
-  lastSecond = g_clockSeconds;
-
-  lv_obj_clear_flag(g_hourLine, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(g_minuteLine, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(g_secondLine, LV_OBJ_FLAG_HIDDEN);
-
-  const int hour = (int)(g_clockSeconds / 3600U);
-  const int minute = (int)((g_clockSeconds / 60U) % 60U);
-  const int second = (int)(g_clockSeconds % 60U);
-
-  const float hourAngle = ((hour % 12) + minute / 60.0f) * 30.0f;
-  const float minuteAngle = (minute + second / 60.0f) * 6.0f;
-  const float secondAngle = second * 6.0f;
-
-  setHandPoints(g_hourHand, CLOCK_SIZE, hourAngle, 42);
-  setHandPoints(g_minuteHand, CLOCK_SIZE, minuteAngle, 62);
-  setHandPoints(g_secondHand, CLOCK_SIZE, secondAngle, 72);
-  lv_line_set_points(g_hourLine, g_hourHand, 2);
-  lv_line_set_points(g_minuteLine, g_minuteHand, 2);
-  lv_line_set_points(g_secondLine, g_secondHand, 2);
-
-  char text[8];
-  snprintf(text, sizeof(text), "%02d:%02d", hour, minute);
-  lv_label_set_text(g_clockTime, text);
-}
-
-void hideClockSettings() {
-  if (g_clockSet != nullptr) {
-    lv_obj_add_flag(g_clockSet, LV_OBJ_FLAG_HIDDEN);
-  }
-}
-
-void showClockSettings() {
-  if (g_clockSet == nullptr) {
-    return;
-  }
-  const uint32_t seconds = ui::clockSeconds();
-  lv_roller_set_selected(g_clockHourRoller, (uint16_t)(seconds / 3600U), LV_ANIM_OFF);
-  lv_roller_set_selected(g_clockMinuteRoller, (uint16_t)((seconds / 60U) % 60U),
-                         LV_ANIM_OFF);
-  lv_obj_clear_flag(g_clockSet, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_move_foreground(g_clockSet);
-}
-
-void clockBackdropCb(lv_event_t* /*e*/) {
-  hideClockSettings();
-}
-
-void clockCancelCb(lv_event_t* /*e*/) {
-  hideClockSettings();
-}
-
-void clockSetCb(lv_event_t* /*e*/) {
-  const int hour = (int)lv_roller_get_selected(g_clockHourRoller);
-  const int minute = (int)lv_roller_get_selected(g_clockMinuteRoller);
-  ui::setClock(hour, minute, 0);
-  hideClockSettings();
-}
-
-lv_obj_t* createClockSettings() {
-  static char hourOptions[24 * 3 + 1];
-  static char minuteOptions[60 * 3 + 1];
-
-  int pos = 0;
-  for (int i = 0; i < 24 && pos < (int)sizeof(hourOptions) - 4; ++i) {
-    pos += snprintf(hourOptions + pos, sizeof(hourOptions) - pos, "%02d\n", i);
-  }
-  if (pos > 0) {
-    hourOptions[pos - 1] = '\0';
-  }
-  pos = 0;
-  for (int i = 0; i < 60 && pos < (int)sizeof(minuteOptions) - 4; ++i) {
-    pos += snprintf(minuteOptions + pos, sizeof(minuteOptions) - pos, "%02d\n", i);
-  }
-  if (pos > 0) {
-    minuteOptions[pos - 1] = '\0';
-  }
-
-  lv_obj_t* backdrop = lv_obj_create(lv_layer_top());
-  lv_obj_remove_style_all(backdrop);
-  lv_obj_set_size(backdrop, LV_HOR_RES, LV_VER_RES);
-  lv_obj_set_pos(backdrop, 0, 0);
-  lv_obj_set_style_bg_color(backdrop, lv_color_black(), 0);
-  lv_obj_set_style_bg_opa(backdrop, (lv_opa_t)170, 0);
-  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_clear_flag(backdrop, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_add_event_cb(backdrop, clockBackdropCb, LV_EVENT_CLICKED, nullptr);
-  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_HIDDEN);
-
-  lv_obj_t* panel = lv_obj_create(backdrop);
-  lv_obj_remove_style_all(panel);
-  lv_obj_set_size(panel, 440, 300);
-  lv_obj_center(panel);
-  lv_obj_set_style_bg_color(panel, lv_color_hex(0x141A20), 0);
-  lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(panel, 16, 0);
-  lv_obj_set_style_border_width(panel, 1, 0);
-  lv_obj_set_style_border_color(panel, lv_color_hex(COL_TRACK), 0);
-  lv_obj_add_flag(panel, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
-
-  lv_obj_t* title = makeLabel(panel, "SET TIME", &lv_font_montserrat_24, COL_TEXT);
-  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 16);
-
-  g_clockHourRoller = lv_roller_create(panel);
-  lv_obj_set_size(g_clockHourRoller, 120, 130);
-  lv_obj_set_pos(g_clockHourRoller, 60, 62);
-  lv_roller_set_options(g_clockHourRoller, hourOptions, LV_ROLLER_MODE_NORMAL);
-  lv_roller_set_visible_row_count(g_clockHourRoller, 3);
-  lv_roller_set_selected(g_clockHourRoller, 0, LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(g_clockHourRoller, lv_color_hex(0x0B0E11), 0);
-  lv_obj_set_style_bg_opa(g_clockHourRoller, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(g_clockHourRoller, 1, 0);
-  lv_obj_set_style_border_color(g_clockHourRoller, lv_color_hex(COL_TRACK), 0);
-  lv_obj_set_style_radius(g_clockHourRoller, 10, 0);
-  lv_obj_set_style_text_font(g_clockHourRoller, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_color(g_clockHourRoller, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_bg_color(g_clockHourRoller, lv_color_hex(COL_TRACK),
-                            LV_PART_SELECTED);
-  lv_obj_set_style_text_color(g_clockHourRoller, lv_color_hex(COL_TEXT),
-                              LV_PART_SELECTED);
-  lv_obj_set_style_text_font(g_clockHourRoller, &lv_font_montserrat_24,
-                             LV_PART_SELECTED);
-
-  g_clockMinuteRoller = lv_roller_create(panel);
-  lv_obj_set_size(g_clockMinuteRoller, 120, 130);
-  lv_obj_set_pos(g_clockMinuteRoller, 260, 62);
-  lv_roller_set_options(g_clockMinuteRoller, minuteOptions, LV_ROLLER_MODE_NORMAL);
-  lv_roller_set_visible_row_count(g_clockMinuteRoller, 3);
-  lv_roller_set_selected(g_clockMinuteRoller, 0, LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(g_clockMinuteRoller, lv_color_hex(0x0B0E11), 0);
-  lv_obj_set_style_bg_opa(g_clockMinuteRoller, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(g_clockMinuteRoller, 1, 0);
-  lv_obj_set_style_border_color(g_clockMinuteRoller, lv_color_hex(COL_TRACK), 0);
-  lv_obj_set_style_radius(g_clockMinuteRoller, 10, 0);
-  lv_obj_set_style_text_font(g_clockMinuteRoller, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_color(g_clockMinuteRoller, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_bg_color(g_clockMinuteRoller, lv_color_hex(COL_TRACK),
-                            LV_PART_SELECTED);
-  lv_obj_set_style_text_color(g_clockMinuteRoller, lv_color_hex(COL_TEXT),
-                              LV_PART_SELECTED);
-  lv_obj_set_style_text_font(g_clockMinuteRoller, &lv_font_montserrat_24,
-                             LV_PART_SELECTED);
-
-  lv_obj_t* colon = makeLabel(panel, ":", &lv_font_montserrat_32, COL_TEXT);
-  lv_obj_set_pos(colon, 210, 102);
-
-  lv_obj_t* hint = makeLabel(panel, "SWIPE TO CHANGE", &lv_font_montserrat_12, COL_DIM);
-  lv_obj_align(hint, LV_ALIGN_TOP_MID, 0, 198);
-
-  lv_obj_t* cancel = lv_btn_create(panel);
-  lv_obj_set_size(cancel, 120, 46);
-  lv_obj_set_pos(cancel, 60, 232);
-  lv_obj_set_style_bg_color(cancel, lv_color_hex(COL_TRACK), 0);
-  lv_obj_set_style_radius(cancel, 10, 0);
-  lv_obj_add_event_cb(cancel, clockCancelCb, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* cancelLabel = makeLabel(cancel, "CANCEL", &lv_font_montserrat_20, COL_TEXT);
-  lv_obj_center(cancelLabel);
-
-  lv_obj_t* set = lv_btn_create(panel);
-  lv_obj_set_size(set, 120, 46);
-  lv_obj_set_pos(set, 260, 232);
-  lv_obj_set_style_bg_color(set, lv_color_hex(COL_CYAN), 0);
-  lv_obj_set_style_radius(set, 10, 0);
-  lv_obj_add_event_cb(set, clockSetCb, LV_EVENT_CLICKED, nullptr);
-  lv_obj_t* setLabel = makeLabel(set, "SET", &lv_font_montserrat_20, COL_BG);
-  lv_obj_center(setLabel);
-
-  lv_obj_move_foreground(backdrop);
-  return backdrop;
-}
-
-void applyBrightness(int percent) {
-  if (percent < 0) {
-    percent = 0;
-  } else if (percent > 100) {
-    percent = 100;
-  }
-  g_brightness = percent;
-
-  if (g_dimmer != nullptr) {
-    const lv_opa_t opa = (lv_opa_t)((100 - g_brightness) * 255 / 100);
-    lv_obj_set_style_bg_opa(g_dimmer, opa, 0);
-  }
-  if (g_brightnessFill != nullptr) {
-    const int height = BRIGHTNESS_TRACK_HEIGHT * g_brightness / 100;
-    lv_obj_set_height(g_brightnessFill, height);
-    lv_obj_align(g_brightnessFill, LV_ALIGN_BOTTOM_MID, 0, 0);
-  }
-  if (g_brightnessValueLabel != nullptr) {
-    char text[8];
-    snprintf(text, sizeof(text), "%d%%", g_brightness);
-    lv_label_set_text(g_brightnessValueLabel, text);
-  }
-}
-
-void showBrightnessIndicator() {
-  if (g_brightnessIndicator == nullptr) {
-    return;
-  }
-  lv_obj_clear_flag(g_brightnessIndicator, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_move_foreground(g_brightnessIndicator);
-  g_brightnessShownMs = lv_tick_get();
-}
-
-void brightnessEventCb(lv_event_t* e) {
-  const lv_event_code_t code = lv_event_get_code(e);
-  if (code == LV_EVENT_PRESSED) {
-    lv_indev_t* indev = lv_indev_get_act();
-    if (indev == nullptr) {
-      return;
-    }
-    lv_point_t p;
-    lv_indev_get_point(indev, &p);
-    g_brightnessDragging = true;
-    g_brightnessStartY = p.y;
-    g_brightnessStartValue = g_brightness;
-    showBrightnessIndicator();
-  } else if (code == LV_EVENT_PRESSING) {
-    if (!g_brightnessDragging) {
-      return;
-    }
-    lv_indev_t* indev = lv_indev_get_act();
-    if (indev == nullptr) {
-      return;
-    }
-    lv_point_t p;
-    lv_indev_get_point(indev, &p);
-    const int range =
-        (int)(LV_VER_RES * BRIGHTNESS_SWIPE_RANGE_FRAC);
-    const int delta = (int)(g_brightnessStartY - p.y) * 100 / range;
-    applyBrightness(g_brightnessStartValue + delta);
-    showBrightnessIndicator();
-  } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-    g_brightnessDragging = false;
-  }
-}
-
-void brightnessHideTimerCb(lv_timer_t* /*timer*/) {
-  if (g_brightnessIndicator == nullptr || g_brightnessDragging) {
-    return;
-  }
-  if (lv_obj_has_flag(g_brightnessIndicator, LV_OBJ_FLAG_HIDDEN)) {
-    return;
-  }
-  if (lv_tick_elaps(g_brightnessShownMs) >= BRIGHTNESS_INDICATOR_HIDE_MS) {
-    lv_obj_add_flag(g_brightnessIndicator, LV_OBJ_FLAG_HIDDEN);
-  }
-}
-
-void createBrightnessControl() {
-  lv_obj_t* top = lv_layer_top();
-
-  g_dimmer = lv_obj_create(top);
-  lv_obj_remove_style_all(g_dimmer);
-  lv_obj_set_pos(g_dimmer, 0, 0);
-  lv_obj_set_size(g_dimmer, LV_HOR_RES, LV_VER_RES);
-  lv_obj_set_style_bg_color(g_dimmer, lv_color_black(), 0);
-  lv_obj_set_style_bg_opa(g_dimmer, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_radius(g_dimmer, 0, 0);
-  lv_obj_clear_flag(g_dimmer, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(g_dimmer, LV_OBJ_FLAG_CLICKABLE);
-
-  g_brightnessIndicator = lv_obj_create(top);
-  lv_obj_remove_style_all(g_brightnessIndicator);
-  lv_obj_set_size(g_brightnessIndicator, 84, 240);
-  lv_obj_align(g_brightnessIndicator, LV_ALIGN_RIGHT_MID, -16, 0);
-  lv_obj_set_style_bg_color(g_brightnessIndicator, lv_color_hex(0x141A20), 0);
-  lv_obj_set_style_bg_opa(g_brightnessIndicator, (lv_opa_t)230, 0);
-  lv_obj_set_style_radius(g_brightnessIndicator, 12, 0);
-  lv_obj_set_style_border_width(g_brightnessIndicator, 1, 0);
-  lv_obj_set_style_border_color(g_brightnessIndicator, lv_color_hex(COL_TRACK), 0);
-  lv_obj_clear_flag(g_brightnessIndicator, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(g_brightnessIndicator, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_flag(g_brightnessIndicator, LV_OBJ_FLAG_HIDDEN);
-
-  g_brightnessValueLabel =
-      makeLabel(g_brightnessIndicator, "100%", &lv_font_montserrat_20, COL_TEXT);
-  lv_obj_align(g_brightnessValueLabel, LV_ALIGN_TOP_MID, 0, 12);
-
-  g_brightnessTrack = lv_obj_create(g_brightnessIndicator);
-  lv_obj_remove_style_all(g_brightnessTrack);
-  lv_obj_set_size(g_brightnessTrack, BRIGHTNESS_TRACK_WIDTH, BRIGHTNESS_TRACK_HEIGHT);
-  lv_obj_align(g_brightnessTrack, LV_ALIGN_BOTTOM_MID, 0, -16);
-  lv_obj_set_style_bg_color(g_brightnessTrack, lv_color_hex(COL_TRACK), 0);
-  lv_obj_set_style_bg_opa(g_brightnessTrack, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(g_brightnessTrack, BRIGHTNESS_TRACK_WIDTH / 2, 0);
-  lv_obj_clear_flag(g_brightnessTrack, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(g_brightnessTrack, LV_OBJ_FLAG_CLICKABLE);
-
-  g_brightnessFill = lv_obj_create(g_brightnessTrack);
-  lv_obj_remove_style_all(g_brightnessFill);
-  lv_obj_set_width(g_brightnessFill, BRIGHTNESS_TRACK_WIDTH);
-  lv_obj_set_height(g_brightnessFill, BRIGHTNESS_TRACK_HEIGHT);
-  lv_obj_align(g_brightnessFill, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_set_style_bg_color(g_brightnessFill, lv_color_hex(COL_CYAN), 0);
-  lv_obj_set_style_bg_opa(g_brightnessFill, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(g_brightnessFill, BRIGHTNESS_TRACK_WIDTH / 2, 0);
-  lv_obj_clear_flag(g_brightnessFill, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_clear_flag(g_brightnessFill, LV_OBJ_FLAG_CLICKABLE);
-
-  g_brightnessZone = lv_obj_create(top);
-  lv_obj_remove_style_all(g_brightnessZone);
-  lv_obj_set_size(g_brightnessZone, BRIGHTNESS_SWIPE_ZONE_WIDTH, LV_VER_RES);
-  lv_obj_align(g_brightnessZone, LV_ALIGN_RIGHT_MID, 0, 0);
-  lv_obj_set_style_bg_opa(g_brightnessZone, LV_OPA_TRANSP, 0);
-  lv_obj_add_flag(g_brightnessZone, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_clear_flag(g_brightnessZone, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_add_event_cb(g_brightnessZone, brightnessEventCb, LV_EVENT_ALL, nullptr);
-
-  g_brightnessHideTimer = lv_timer_create(brightnessHideTimerCb, 50, nullptr);
+  ui::internal::clockUpdate();
 }
 
 }  // namespace
@@ -1104,20 +723,22 @@ void init() {
   lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
   // Status icons follow an arc concentric with the speedometer.
-  g_iconOil = createOrbitIcon(screen, &icon_oil, 0, COL_RED);
-  g_iconChg = createOrbitIcon(screen, &icon_charge, 1, COL_RED);
-  g_iconBrake = createOrbitIcon(screen, &icon_brake, 2, COL_RED);
-  g_iconGlow = createOrbitIcon(screen, &icon_glow, 3, COL_YELLOW);
-  g_iconFog = createOrbitIcon(screen, &icon_fog, 4, COL_GREEN);
-  g_iconLowBeam = createOrbitIcon(screen, &icon_beam_low, 5, COL_GREEN);
-  g_iconBeam = createOrbitIcon(screen, &icon_beam_high, 5, COL_BLUE);
+  g_iconOil = createOrbitIcon(screen, &icon_oil, 0);
+  g_iconChg = createOrbitIcon(screen, &icon_charge, 1);
+  g_iconBrake = createOrbitIcon(screen, &icon_brake, 2);
+  g_iconBrakeFault = createOrbitIcon(screen, &icon_brake_fault, 2);
+  lv_obj_set_style_img_opa(g_iconBrakeFault, LV_OPA_0, 0);
+  g_iconGlow = createOrbitIcon(screen, &icon_glow, 3);
+  g_iconFog = createOrbitIcon(screen, &icon_anti_fog, 4);
+  g_iconLowBeam = createOrbitIcon(screen, &icon_beam_low, 5);
+  g_iconBeam = createOrbitIcon(screen, &icon_beam_high, 5);
 
   // Classic VW turn signal arrows: left on the left edge, right on the right edge.
   g_turnLeft = createTurnArrow(screen, &icon_arrow_left, 20, 8);
   g_turnRight = createTurnArrow(screen, &icon_arrow_right, 726, 8);
 
   // Left: clock. Center: large speedometer. Right: tachometer.
-  createClock(screen, 14, 125, CLOCK_SIZE);
+  ui::internal::clockInit(screen);
 
   g_speed = createGauge(screen, 242, 75, SPEED_SIZE, "", "km/h", 180, COL_CYAN,
                         -1.0f, 10.0f, 20.0f, false, 22, &lv_font_montserrat_48,
@@ -1218,55 +839,37 @@ void init() {
   lv_obj_clear_flag(g_fuelOutline, LV_OBJ_FLAG_CLICKABLE);
 
   g_splash = createSplash(screen);
-  g_bye = createByeScreen(screen);
+  ui::internal::byeInit(screen);
 
-  const time_t now = time(nullptr);
-  if (now >= 1600000000) {
-    struct tm* tmv = localtime(&now);
-    if (tmv != nullptr) {
-      setClock(tmv->tm_hour, tmv->tm_min, tmv->tm_sec);
-    } else {
-      setClock(0, 0, 0);
-    }
-  } else {
-    setClock(0, 0, 0);
-  }
-
-  createBrightnessControl();
-  applyBrightness(g_brightness);
+  ui::internal::brightnessInit();
 
   lv_obj_t* clockHit = lv_obj_create(lv_layer_top());
   lv_obj_remove_style_all(clockHit);
-  lv_obj_set_size(clockHit, CLOCK_SIZE, CLOCK_SIZE);
-  lv_obj_set_pos(clockHit, 14, 125);
+  lv_obj_set_size(clockHit, ui::internal::CLOCK_SIZE, ui::internal::CLOCK_SIZE);
+  lv_obj_set_pos(clockHit, ui::internal::CLOCK_X, ui::internal::CLOCK_Y);
   lv_obj_set_style_bg_opa(clockHit, LV_OPA_TRANSP, 0);
   lv_obj_add_flag(clockHit, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_clear_flag(clockHit, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_event_cb(clockHit, clockTapCb, LV_EVENT_CLICKED, nullptr);
 
-  g_clockSet = createClockSettings();
+  lv_obj_t* dialHit = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(dialHit);
+  lv_obj_set_size(dialHit, SPEED_SIZE, SPEED_SIZE);
+  lv_obj_set_pos(dialHit, 242, 75);
+  lv_obj_set_style_bg_opa(dialHit, LV_OPA_TRANSP, 0);
+  lv_obj_add_flag(dialHit, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(dialHit, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(dialHit, gaugeTapCb, LV_EVENT_ALL, nullptr);
+
+  ui::internal::clockSettingsInit();
+  g_colorMenu = createColorMenu();
 }
 
 void update(const Values& v) {
-  if (!v.ignitionOn) {
-    if (!g_ignitionOff) {
-      showByeScreen();
-    } else if (!g_byeFadingOut &&
-               lv_tick_elaps(g_ignitionOffMs) >= BYE_HOLD_MS) {
-      g_byeFadingOut = true;
-      lv_anim_t anim;
-      lv_anim_init(&anim);
-      lv_anim_set_var(&anim, g_byeContent);
-      lv_anim_set_values(&anim, LV_OPA_COVER, LV_OPA_TRANSP);
-      lv_anim_set_time(&anim, BYE_FADE_OUT_MS);
-      lv_anim_set_exec_cb(&anim, byeContentOpaAnimCb);
-      lv_anim_start(&anim);
-    }
+  if (ui::internal::byeUpdate(v.ignitionOn)) {
+    ui::internal::clockHideSettings();
+    colorMenuHide();
     return;
-  }
-
-  if (g_ignitionOff) {
-    hideByeScreen();
   }
 
   if (!g_bootStarted) {
@@ -1278,7 +881,7 @@ void update(const Values& v) {
       g_bootSkipped ? (BOOT_TOTAL_MS + 1) : (lv_tick_get() - g_bootStartMs);
 
   if (elapsed < BOOT_SPLASH_MS) {
-    updateClock();
+    ui::internal::clockUpdate();
     return;
   }
 
@@ -1317,7 +920,8 @@ void update(const Values& v) {
     selfTest.oilWarning = true;
     selfTest.chargeWarning = true;
     selfTest.glowPlug = true;
-    selfTest.parkingBrake = true;
+    selfTest.parkingBrake = sweep < 0.5f;
+    selfTest.brakeFault = sweep >= 0.5f;
     selfTest.highBeam = true;
     selfTest.lowBeam = false;
     selfTest.fogLight = true;
@@ -1335,45 +939,6 @@ void update(const Values& v) {
 
 void skipBoot() {
   g_bootSkipped = true;
-}
-
-void setBrightness(int percent) {
-  applyBrightness(percent);
-}
-
-int brightness() {
-  return g_brightness;
-}
-
-void setClock(int hour, int minute, int second) {
-  hour %= 24;
-  if (hour < 0) {
-    hour += 24;
-  }
-  if (minute < 0) {
-    minute = 0;
-  } else if (minute > 59) {
-    minute = 59;
-  }
-  if (second < 0) {
-    second = 0;
-  } else if (second > 59) {
-    second = 59;
-  }
-  g_clockSeconds = (uint32_t)(hour * 3600 + minute * 60 + second);
-  g_clockLastTick = lv_tick_get();
-  g_clockChanged = true;
-}
-
-uint32_t clockSeconds() {
-  advanceClock();
-  return g_clockSeconds;
-}
-
-bool consumeClockChanged() {
-  const bool changed = g_clockChanged;
-  g_clockChanged = false;
-  return changed;
 }
 
 }  // namespace ui

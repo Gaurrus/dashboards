@@ -2,10 +2,12 @@
 #define LV_CONF_H
 
 // Minimal LVGL 8.4 configuration for the desktop simulator.
-// All other options fall back to LVGL defaults.
+// Emulates Waveshare ESP32-S3: RGB565 and ~6 MB of PSRAM left for LVGL
+// after the display buffers. All other options use LVGL defaults.
 
-#define LV_COLOR_DEPTH 32
-#define LV_MEM_SIZE (8U * 1024U * 1024U)
+#define LV_COLOR_DEPTH 16
+#define LV_COLOR_16_SWAP 0
+#define LV_MEM_SIZE (6U * 1024U * 1024U)
 
 #define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
@@ -17,5 +19,6 @@
 
 #define LV_USE_GIF 1
 #define LV_USE_LOG 0
+
 
 #endif

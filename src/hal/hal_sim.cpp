@@ -18,6 +18,8 @@ void Hal::begin() {
   pinMode(cfg::PIN_BTN_OIL, INPUT_PULLUP);
   pinMode(cfg::PIN_BTN_BEAM, INPUT_PULLUP);
   pinMode(cfg::PIN_BTN_TURN_L, INPUT_PULLUP);
+  pinMode(cfg::PIN_BTN_BRAKE, INPUT_PULLUP);
+  pinMode(cfg::PIN_BTN_BRAKE_FAULT, INPUT_PULLUP);
 
   pinMode(cfg::PIN_BUZZER, OUTPUT);
   digitalWrite(cfg::PIN_BUZZER, LOW);
@@ -50,4 +52,6 @@ void Hal::poll(RawInputs& out) {
   out.chargeWarning = false;
   out.turnRight = false;
   out.glowPlug = false;
+  out.parkingBrake = digitalRead(cfg::PIN_BTN_BRAKE) == LOW;
+  out.brakeFault = digitalRead(cfg::PIN_BTN_BRAKE_FAULT) == LOW;
 }

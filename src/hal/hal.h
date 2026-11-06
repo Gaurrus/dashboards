@@ -28,6 +28,8 @@ struct RawInputs {
   bool turnLeft = false;
   bool turnRight = false;
   bool glowPlug = false;
+  bool parkingBrake = false;
+  bool brakeFault = false;  // low brake fluid or failed brake circuit
 };
 
 class Hal {
