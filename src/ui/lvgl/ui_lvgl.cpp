@@ -25,7 +25,6 @@ constexpr float SPEED_CY = 75.0f + SPEED_SIZE / 2.0f;
 constexpr float ICON_ORBIT_R = 205.0f;
 constexpr float ICON_ORBIT_START_DEG = -40.0f;
 constexpr float ICON_ORBIT_STEP_DEG = 16.0f;
-constexpr int STATUS_ICON_SIZE = 30;
 
 struct Gauge {
   lv_obj_t* arc = nullptr;
@@ -343,8 +342,9 @@ lv_obj_t* createOrbitIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int index,
   const float rad = deg * 3.14159265f / 180.0f;
   const int cx = (int)(SPEED_CX + ICON_ORBIT_R * sinf(rad) + 0.5f);
   const int cy = (int)(SPEED_CY - ICON_ORBIT_R * cosf(rad) + 0.5f);
-  return createStatusIcon(parent, src, cx - STATUS_ICON_SIZE / 2,
-                          cy - STATUS_ICON_SIZE / 2, color);
+  const int iw = (int)src->header.w;
+  const int ih = (int)src->header.h;
+  return createStatusIcon(parent, src, cx - iw / 2, cy - ih / 2, color);
 }
 
 lv_obj_t* createTurnArrow(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y) {
