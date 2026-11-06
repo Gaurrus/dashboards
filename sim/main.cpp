@@ -254,6 +254,8 @@ int main(int argc, char** argv) {
   const bool sweepShot = argc >= 3 && SDL_strcmp(argv[2], "sweep") == 0;
   const bool hotShot = argc >= 3 && SDL_strcmp(argv[2], "hot") == 0;
   const bool lowShot = argc >= 3 && SDL_strcmp(argv[2], "low") == 0;
+  const bool brakeShot = argc >= 3 && SDL_strcmp(argv[2], "brake") == 0;
+  const bool brakeFaultShot = argc >= 3 && SDL_strcmp(argv[2], "brakefault") == 0;
   const bool videoShot = argc >= 3 && SDL_strcmp(argv[2], "video") == 0;
   const bool videoBrightShot = argc >= 3 && SDL_strcmp(argv[2], "video_bright") == 0;
   const bool videoAllShot = argc >= 3 && SDL_strcmp(argv[2], "video_all") == 0;
@@ -476,7 +478,7 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  float t = lowShot ? 6.0f : 0.0f;
+  float t = lowShot ? 6.0f : (brakeShot ? 4.0f : (brakeFaultShot ? 24.0f : 0.0f));
   uint32_t lastTick = SDL_GetTicks();
 
   for (int frame = 0; frame < 4; ++frame) {

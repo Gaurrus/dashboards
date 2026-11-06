@@ -12,6 +12,8 @@
     { "type": "wokwi-pushbutton", "id": "btnOil", "top": 470, "left": 0, "attrs": {} },
     { "type": "wokwi-pushbutton", "id": "btnBeam", "top": 470, "left": 130, "attrs": {} },
     { "type": "wokwi-pushbutton", "id": "btnTurnL", "top": 470, "left": 260, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btnBrake", "top": 570, "left": 0, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btnBrakeFault", "top": 570, "left": 130, "attrs": {} },
     { "type": "wokwi-buzzer", "id": "bz1", "top": 470, "left": 400, "attrs": { "volume": "0.1" } }
   ],
   "connections": [
@@ -52,6 +54,12 @@
 
     ["esp:D27", "btnTurnL:1.l", "green", []],
     ["esp:GND.2", "btnTurnL:2.l", "black", []],
+
+    ["esp:D5", "btnBrake:1.l", "green", []],
+    ["esp:GND.2", "btnBrake:2.l", "black", []],
+
+    ["esp:D13", "btnBrakeFault:1.l", "green", []],
+    ["esp:GND.2", "btnBrakeFault:2.l", "black", []],
 
     ["esp:D33", "bz1:1", "green", []],
     ["esp:GND.1", "bz1:2", "black", []]

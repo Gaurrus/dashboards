@@ -85,7 +85,14 @@ inline Values make(float t, bool ignitionOn = true) {
   }
   v.oilWarning = (lamp == 0);
   v.chargeWarning = (lamp == 1);
-  v.parkingBrake = (lamp == 2);
+  if (lamp == 2) {
+    // Brake slot: alternate between handbrake and a brake fault.
+    if ((steps / (2 * kLampSpan)) % 2 == 0) {
+      v.parkingBrake = true;
+    } else {
+      v.brakeFault = true;
+    }
+  }
   v.glowPlug = (lamp == 3);
   v.fogLight = (lamp == 4);
   if (lamp == kLampSpan) {

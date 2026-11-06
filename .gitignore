@@ -1,6 +1,7 @@
 .pio/
 .vscode/
 .DS_Store
+__pycache__/
 sim/build/
 sim/third_party/lvgl/
 dist/

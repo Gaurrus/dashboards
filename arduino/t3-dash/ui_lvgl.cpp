@@ -71,6 +71,7 @@ lv_obj_t* g_iconBeam = nullptr;
 lv_obj_t* g_iconLowBeam = nullptr;
 lv_obj_t* g_iconFog = nullptr;
 lv_obj_t* g_iconBrake = nullptr;
+lv_obj_t* g_iconBrakeFault = nullptr;
 lv_obj_t* g_turnLeft = nullptr;
 lv_obj_t* g_turnRight = nullptr;
 
@@ -680,7 +681,15 @@ void applyValues(const Values& v) {
   setIconState(g_iconChg, v.chargeWarning);
   setIconState(g_iconGlow, v.glowPlug);
   setIconState(g_iconFog, v.fogLight);
-  setIconState(g_iconBrake, v.parkingBrake);
+
+  // Parking brake and brake fault share one orbit slot. A fault wins; if both
+  // are active, alternate so neither condition is hidden.
+  bool showBrakeFault = v.brakeFault;
+  if (v.brakeFault && v.parkingBrake && !g_selfTestActive) {
+    showBrakeFault = ((lv_tick_get() / 700U) & 1U) == 0U;
+  }
+  setIconState(g_iconBrake, v.parkingBrake && !showBrakeFault);
+  setIconState(g_iconBrakeFault, showBrakeFault);
 
   if (v.highBeam) {
     lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_0, 0);
@@ -717,6 +726,8 @@ void init() {
   g_iconOil = createOrbitIcon(screen, &icon_oil, 0);
   g_iconChg = createOrbitIcon(screen, &icon_charge, 1);
   g_iconBrake = createOrbitIcon(screen, &icon_brake, 2);
+  g_iconBrakeFault = createOrbitIcon(screen, &icon_brake_fault, 2);
+  lv_obj_set_style_img_opa(g_iconBrakeFault, LV_OPA_0, 0);
   g_iconGlow = createOrbitIcon(screen, &icon_glow, 3);
   g_iconFog = createOrbitIcon(screen, &icon_anti_fog, 4);
   g_iconLowBeam = createOrbitIcon(screen, &icon_beam_low, 5);
@@ -909,7 +920,8 @@ void update(const Values& v) {
     selfTest.oilWarning = true;
     selfTest.chargeWarning = true;
     selfTest.glowPlug = true;
-    selfTest.parkingBrake = true;
+    selfTest.parkingBrake = sweep < 0.5f;
+    selfTest.brakeFault = sweep >= 0.5f;
     selfTest.highBeam = true;
     selfTest.lowBeam = false;
     selfTest.fogLight = true;

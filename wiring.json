@@ -2,7 +2,7 @@
   "version": 1,
   "author": "T3 Dash",
   "editor": "manual",
-  "description": "Подключение датчиков VW T3 с дизелем 1.6 D/TD (CS/JX) к Waveshare ESP32-S3-Touch-LCD-7: I2C, GPIO6 (ABS), UART2, оптопары. Скорость — с ABS-гребёнки. Это документация, а не Wokwi-симуляция.",
+  "description": "Подключение датчиков VW T3 с дизелем 1.6 D/TD (CS/JX) к Waveshare ESP32-S3-Touch-LCD-7: I2C, GPIO6 (ABS), UART2, оптопары. Скорость — с ABS-гребёнки. Ручник и неисправность тормозов — раздельные входы. Это документация, а не Wokwi-симуляция.",
   "board": {
     "name": "Waveshare ESP32-S3-Touch-LCD-7",
     "mcu": "ESP32-S3",
@@ -139,8 +139,9 @@
     ["opto:OUT6", "mcp:GPA5", "green", ["turn right"]],
     ["opto:OUT7", "mcp:GPA6", "green", ["glow plug"]],
     ["opto:OUT8", "mcp:GPA7", "green", ["ignition on"]],
-    ["opto:OUT9", "mcp:GPB0", "green", ["parking brake (optional)"]],
+    ["opto:OUT9", "mcp:GPB0", "green", ["parking brake (handbrake switch)"]],
     ["opto:OUT10", "mcp:GPB1", "green", ["oil pressure 1.8 bar (optional, 1.6 TD)"]],
+    ["opto:OUT11", "mcp:GPB2", "green", ["brake fault: low fluid / circuit failure"]],
 
     ["opto:BOARD_GND", "board:I2C_GND", "black", ["output side"]],
     ["opto:CAR_GND", "car:GND", "black", ["input side; isolated from board GND"]],
@@ -152,8 +153,9 @@
     ["opto:IN6", "signal:turnRight", "orange", ["12V active-high"]],
     ["opto:IN7", "signal:glowPlug", "orange", ["12V active-high"]],
     ["opto:IN8", "signal:ignition", "orange", ["12V active-high"]],
-    ["opto:IN9", "signal:parkingBrake", "orange", ["12V active-high, optional"]],
+    ["opto:IN9", "signal:parkingBrake", "orange", ["12V active-high, make-to-ground handbrake switch"]],
     ["opto:IN10", "signal:oilHigh", "orange", ["12V active-high, optional 1.8 bar"]],
+    ["opto:IN11", "signal:brakeFault", "orange", ["12V active-high, fluid level / pressure differential switch"]],
 
     ["board:I2C_3V3", "absCond:VDD", "red", ["conditioner supply"]],
     ["board:I2C_GND", "absCond:GND", "black", ["common ground"]],
@@ -185,7 +187,8 @@
     { "name": "glowPlug", "source": "12V свечи накала", "input": "MCP23017 GPA6", "note": "active-low" },
     { "name": "ignition", "source": "12V клемма 15 (зажигание)", "input": "MCP23017 GPA7", "note": "active-low" },
     { "name": "oilHigh", "source": "12V 1.8 бар (1.6 TD)", "input": "MCP23017 GPB1", "note": "опционально" },
-    { "name": "parkingBrake", "source": "12V ручник", "input": "MCP23017 GPB0", "note": "опционально" }
+    { "name": "parkingBrake", "source": "концевик ручника (замыкает на массу)", "input": "MCP23017 GPB0", "note": "отдельный вход; в UI — иконка (P)" },
+    { "name": "brakeFault", "source": "датчик уровня жидкости / дифференциальный датчик давления", "input": "MCP23017 GPB2", "note": "отдельный вход; в UI — иконка brake failure" }
   ],
   "notes": [
     "I2C на GPIO8/9 общая с GT911 и CH422G: используйте только свободные адреса.",
@@ -202,6 +205,8 @@
     "Скорость с ABS калибровать по числу зубьев гребёнки и реальной окружности колеса; направление и пропуски зубьев проверить.",
     "Тахометр 1.6 diesel: UI 0–5500, красная зона начинается с 4500 (практический предел ~4800).",
     "1.6 TD: динамическая система давления масла 0.3/1.8 бар — второй вход опционален (GPB1).",
+    "Тормоза: ручник и неисправность (уровень жидкости / отказ контура) заводятся раздельно — GPB0 и GPB2, чтобы UI различал источники.",
+    "Штатная лампа BRAKE остаётся рабочей: ESP32 только слушает те же провода через оптопары, ничего не разрывая.",
     "Кривые температуры/топлива проверить по дизельным датчикам; они могут отличаться от waterboxer.",
     "Записи signal:* и car:GND — именованные внешние цепи автомобиля, а не детали на плате.",
     "Диаграмма: wiring.svg / wiring.png; подробный netlist: wiring.json."
