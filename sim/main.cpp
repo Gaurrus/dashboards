@@ -263,6 +263,9 @@ int main(int argc, char** argv) {
   const bool clockShot = argc >= 3 && SDL_strcmp(argv[2], "clock") == 0;
   const bool clocksetShot = argc >= 3 && SDL_strcmp(argv[2], "clockset") == 0;
   const bool perfShot = argc >= 3 && SDL_strcmp(argv[2], "perf") == 0;
+  const bool dialMenuShot = argc >= 3 && SDL_strcmp(argv[2], "dialmenu") == 0;
+  const bool dialPickShot = argc >= 3 && SDL_strcmp(argv[2], "dialpick") == 0;
+  const bool dialShot = dialMenuShot || dialPickShot;
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -320,8 +323,56 @@ int main(int argc, char** argv) {
     lv_obj_add_flag(lv_layer_sys(), LV_OBJ_FLAG_HIDDEN);
   }
   if (screenshot && !bootShot && !sweepShot && !hotShot && !videoShot &&
-      !videoBrightShot && !videoAllShot && !perfShot) {
+      !videoBrightShot && !videoAllShot && !perfShot && !dialShot) {
     ui::skipBoot();
+  }
+  if (dialShot) {
+    ui::update(demo::make(0.0f));
+    // Hold inside the speedometer dial for 3 s to open the arc color menu.
+    gMouseX = 400;
+    gMouseY = 233;
+    gMouseDown = true;
+    for (int i = 0; i < 40; ++i) {
+      lv_tick_inc(90);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    lv_tick_inc(90);
+    lv_timer_handler();
+    if (dialPickShot) {
+      // Two full pick cycles in one run: green (row 0 col 1), then blue
+      // (row 1 col 0). Ends blue only if repeat picks keep working.
+      for (int pick = 0; pick < 2; ++pick) {
+        for (int i = 0; i < 4; ++i) {
+          lv_tick_inc(60);
+          lv_timer_handler();
+        }
+        gMouseX = 400;
+        gMouseY = 233;
+        gMouseDown = true;
+        for (int i = 0; i < 40; ++i) {
+          lv_tick_inc(90);
+          lv_timer_handler();
+        }
+        gMouseDown = false;
+        for (int i = 0; i < 4; ++i) {
+          lv_tick_inc(60);
+          lv_timer_handler();
+        }
+        gMouseX = pick == 0 ? 358 : 274;
+        gMouseY = pick == 0 ? 209 : 293;
+        gMouseDown = true;
+        for (int i = 0; i < 4; ++i) {
+          lv_tick_inc(60);
+          lv_timer_handler();
+        }
+        gMouseDown = false;
+        for (int i = 0; i < 4; ++i) {
+          lv_tick_inc(60);
+          lv_timer_handler();
+        }
+      }
+    }
   }
   if (perfShot) {
     ui::skipBoot();

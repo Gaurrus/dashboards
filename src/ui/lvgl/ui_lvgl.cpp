@@ -1,6 +1,7 @@
 #include "ui_lvgl.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 
 #include "icons.h"
@@ -447,6 +448,154 @@ void clockTapCb(lv_event_t* /*e*/) {
   ui::internal::clockShowSettings();
 }
 
+// --- Speedometer arc color: hold 3 s inside the dial circle for the menu. ---
+constexpr uint32_t kArcColors[] = {
+    COL_CYAN,   COL_GREEN, COL_ORANGE, COL_YELLOW,
+    COL_BLUE,   COL_RED,   COL_TEXT,   0xA855F7,
+};
+constexpr int kArcColorCount = 8;
+constexpr uint32_t kDialHoldMs = 3000;
+constexpr float kDialCenterX = 399.5f;
+constexpr float kDialCenterY = 232.5f;
+constexpr float kDialRadius = 155.0f;
+
+lv_obj_t* g_colorMenu = nullptr;
+lv_obj_t* g_colorSwatches[kArcColorCount] = {};
+uint32_t g_speedArcColor = COL_CYAN;
+int g_speedArcIndex = 0;
+bool g_dialPressActive = false;
+bool g_colorMenuOpenedForPress = false;
+uint32_t g_dialPressMs = 0;
+
+bool pointInDial(const lv_point_t& p) {
+  const float dx = (float)p.x - kDialCenterX;
+  const float dy = (float)p.y - kDialCenterY;
+  return dx * dx + dy * dy <= kDialRadius * kDialRadius;
+}
+
+void setSpeedArcColor(uint32_t color, int index) {
+  g_speedArcColor = color;
+  g_speedArcIndex = index;
+  if (g_speed.value != nullptr) {
+    lv_obj_set_style_text_color(g_speed.value, lv_color_hex(color), 0);
+  }
+  for (int i = 0; i < kArcColorCount; ++i) {
+    if (g_colorSwatches[i] == nullptr) {
+      continue;
+    }
+    const bool selected = (i == index);
+    lv_obj_set_style_border_width(g_colorSwatches[i], selected ? 3 : 1, 0);
+    lv_obj_set_style_border_color(
+        g_colorSwatches[i], lv_color_hex(selected ? COL_TEXT : COL_TRACK), 0);
+  }
+}
+
+void colorMenuShow() {
+  if (g_colorMenu == nullptr) {
+    return;
+  }
+  lv_obj_clear_flag(g_colorMenu, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(g_colorMenu);
+}
+
+void colorMenuHide() {
+  if (g_colorMenu != nullptr) {
+    lv_obj_add_flag(g_colorMenu, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+void colorSwatchCb(lv_event_t* e) {
+  const int index = (int)(intptr_t)lv_event_get_user_data(e);
+  if (index >= 0 && index < kArcColorCount) {
+    setSpeedArcColor(kArcColors[index], index);
+  }
+  colorMenuHide();
+}
+
+void colorBackdropCb(lv_event_t* /*e*/) {
+  colorMenuHide();
+}
+
+void gaugeTapCb(lv_event_t* e) {
+  const lv_event_code_t code = lv_event_get_code(e);
+  lv_indev_t* indev = lv_indev_get_act();
+  lv_point_t p{0, 0};
+  if (indev != nullptr) {
+    lv_indev_get_point(indev, &p);
+  }
+
+  if (code == LV_EVENT_PRESSED) {
+    g_dialPressActive = false;
+    g_colorMenuOpenedForPress = false;
+    if (pointInDial(p)) {
+      g_dialPressActive = true;
+      g_dialPressMs = lv_tick_get();
+    }
+  } else if (code == LV_EVENT_PRESSING) {
+    if (!g_dialPressActive || g_colorMenuOpenedForPress) {
+      return;
+    }
+    if (!pointInDial(p)) {
+      g_dialPressActive = false;
+      return;
+    }
+    if (lv_tick_elaps(g_dialPressMs) >= kDialHoldMs) {
+      colorMenuShow();
+      g_colorMenuOpenedForPress = true;
+    }
+  } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+    g_dialPressActive = false;
+  }
+}
+
+lv_obj_t* createColorMenu() {
+  lv_obj_t* backdrop = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(backdrop);
+  lv_obj_set_size(backdrop, LV_HOR_RES, LV_VER_RES);
+  lv_obj_set_pos(backdrop, 0, 0);
+  lv_obj_set_style_bg_color(backdrop, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(backdrop, (lv_opa_t)170, 0);
+  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(backdrop, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(backdrop, colorBackdropCb, LV_EVENT_CLICKED, nullptr);
+  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_HIDDEN);
+
+  lv_obj_t* panel = lv_obj_create(backdrop);
+  lv_obj_remove_style_all(panel);
+  lv_obj_set_size(panel, 440, 300);
+  lv_obj_center(panel);
+  lv_obj_set_style_bg_color(panel, lv_color_hex(0x141A20), 0);
+  lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(panel, 16, 0);
+  lv_obj_set_style_border_width(panel, 1, 0);
+  lv_obj_set_style_border_color(panel, lv_color_hex(COL_TRACK), 0);
+  lv_obj_add_flag(panel, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t* title = makeLabel(panel, "ARC COLOR", &lv_font_montserrat_24, COL_TEXT);
+  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
+
+  for (int i = 0; i < kArcColorCount; ++i) {
+    const int col = i % 4;
+    const int row = i / 4;
+    lv_obj_t* swatch = lv_btn_create(panel);
+    lv_obj_set_size(swatch, 70, 70);
+    lv_obj_set_pos(swatch, 59 + col * 84, 84 + row * 84);
+    lv_obj_set_style_bg_color(swatch, lv_color_hex(kArcColors[i]), 0);
+    lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(swatch, 12, 0);
+    lv_obj_set_style_border_width(swatch, 1, 0);
+    lv_obj_set_style_border_color(swatch, lv_color_hex(COL_TRACK), 0);
+    lv_obj_clear_flag(swatch, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(swatch, colorSwatchCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    g_colorSwatches[i] = swatch;
+  }
+
+  lv_obj_move_foreground(backdrop);
+  setSpeedArcColor(g_speedArcColor, g_speedArcIndex);
+  return backdrop;
+}
+
 lv_obj_t* createSplash(lv_obj_t* parent) {
   lv_obj_t* splash = lv_obj_create(parent);
   lv_obj_remove_style_all(splash);
@@ -467,7 +616,7 @@ lv_obj_t* createSplash(lv_obj_t* parent) {
 }
 
 void applyValues(const Values& v) {
-  updateGauge(g_speed, v.speedKmh, v.speedValid, COL_CYAN);
+  updateGauge(g_speed, v.speedKmh, v.speedValid, g_speedArcColor);
   updateGauge(g_rpm, v.rpm, v.rpmValid, COL_ORANGE);
 
   updateTempBar(v);
@@ -654,12 +803,23 @@ void init() {
   lv_obj_clear_flag(clockHit, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_event_cb(clockHit, clockTapCb, LV_EVENT_CLICKED, nullptr);
 
+  lv_obj_t* dialHit = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(dialHit);
+  lv_obj_set_size(dialHit, SPEED_SIZE, SPEED_SIZE);
+  lv_obj_set_pos(dialHit, 242, 75);
+  lv_obj_set_style_bg_opa(dialHit, LV_OPA_TRANSP, 0);
+  lv_obj_add_flag(dialHit, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(dialHit, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(dialHit, gaugeTapCb, LV_EVENT_ALL, nullptr);
+
   ui::internal::clockSettingsInit();
+  g_colorMenu = createColorMenu();
 }
 
 void update(const Values& v) {
   if (ui::internal::byeUpdate(v.ignitionOn)) {
     ui::internal::clockHideSettings();
+    colorMenuHide();
     return;
   }
 
