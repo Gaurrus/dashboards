@@ -15,6 +15,16 @@ add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2_APP REQUIRED IMPORTED_TARGET sdl2)
 
+set(VERSION_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/../include/version.h)
+add_custom_command(
+  OUTPUT ${VERSION_HEADER}
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/gen_version.py
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../VERSION
+  COMMENT "Generating include/version.h"
+  VERBATIM
+)
+add_custom_target(t3dash_version_header DEPENDS ${VERSION_HEADER})
+
 add_executable(t3dash_sim
   main.cpp
   ../src/ui/lvgl/ui_lvgl.cpp
@@ -36,3 +46,5 @@ target_link_libraries(t3dash_sim PRIVATE
   PkgConfig::SDL2_APP
   m
 )
+
+add_dependencies(t3dash_sim t3dash_version_header)
