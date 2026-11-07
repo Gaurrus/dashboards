@@ -83,6 +83,7 @@
    ./build/t3dash_sim /tmp/selfcheck.bmp sweep
    sips -s format png /tmp/selfcheck.bmp --out preview-selfcheck.png
    ```
+
    - Файл: `sim/preview-selfcheck.png` (игнорируется правилом `sim/preview*.png`).
    - Для максимального self-test использовать режим `hot`:
      `./build/t3dash_sim /tmp/selfcheck.bin hot`.
@@ -139,4 +140,5 @@
   пропустить; README/HANDOFF обновлять всегда, версия — патч.
 - Не запускать два `pio`-билда одновременно.
 - Перед коммитом загружать скил `git-conventions` и следовать ему.
+- При запросе влить в main делать через PR merge-commit стратегия
 - Секреты, токены и локальные пути не коммитить.
