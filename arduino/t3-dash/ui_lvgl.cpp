@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #if defined(ARDUINO)
 #include <esp_heap_caps.h>
@@ -54,6 +55,9 @@ struct Gauge {
 
 Gauge g_speed;
 Gauge g_rpm;
+
+void setLabelText(lv_obj_t* label, const char* text);
+void setTextColor(lv_obj_t* obj, uint32_t color);
 
 // lv_line_set_points() keeps the pointer, so the point arrays must live forever.
 constexpr int kMaxTicks = 128;
@@ -442,8 +446,11 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent,
       }
     }
     if (lit != g.litCount) {
+      const int oldLit = g.litCount;
       g.litCount = lit;
-      for (int i = 0; i < g.tickMarkCount; ++i) {
+      const int from = oldLit < 0 ? 0 : LV_MIN(oldLit, lit);
+      const int to = oldLit < 0 ? g.tickMarkCount : LV_MAX(oldLit, lit);
+      for (int i = from; i < to; ++i) {
         const bool on = i < lit;
         const uint32_t markColor = on ? COL_YELLOW_BRIGHT : g.tickColors[i];
         lv_obj_set_style_line_color(g.tickMarks[i], lv_color_hex(markColor), 0);
@@ -463,7 +470,7 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent,
   } else {
     snprintf(text, sizeof(text), "%d", (int)(value + 0.5f));
   }
-  lv_label_set_text(g.value, text);
+  setLabelText(g.value, text);
 }
 
 void setImgOpa(lv_obj_t* obj, lv_opa_t opa) {
@@ -471,6 +478,30 @@ void setImgOpa(lv_obj_t* obj, lv_opa_t opa) {
     return;
   }
   lv_obj_set_style_img_opa(obj, opa, 0);
+}
+
+// lv_label_set_text() invalidates the object even when the string is unchanged.
+void setLabelText(lv_obj_t* label, const char* text) {
+  if (label == nullptr) {
+    return;
+  }
+  const char* current = lv_label_get_text(label);
+  if (current != nullptr && strcmp(current, text) == 0) {
+    return;
+  }
+  lv_label_set_text(label, text);
+}
+
+// Style setters invalidate the whole object; compare the quantized color.
+void setTextColor(lv_obj_t* obj, uint32_t color) {
+  if (obj == nullptr) {
+    return;
+  }
+  const lv_color_t target = lv_color_hex(color);
+  if (lv_color_to32(lv_obj_get_style_text_color(obj, 0)) == lv_color_to32(target)) {
+    return;
+  }
+  lv_obj_set_style_text_color(obj, target, 0);
 }
 
 void setIconState(lv_obj_t* icon, bool on) {
@@ -534,9 +565,8 @@ void updateTempBar(const Values& v) {
   } else {
     snprintf(text, sizeof(text), "TEMP C --");
   }
-  lv_label_set_text(g_tempLabel, text);
-  lv_obj_set_style_text_color(g_tempLabel, lv_color_hex(v.tempWarning ? COL_RED : COL_TEXT),
-                              0);
+  setLabelText(g_tempLabel, text);
+  setTextColor(g_tempLabel, v.tempWarning ? COL_RED : COL_TEXT);
 
   float frac = 0.0f;
   if (v.coolantValid) {
@@ -550,8 +580,12 @@ void updateTempBar(const Values& v) {
   }
 
   const int filled = (int)(210.0f * frac);
-  lv_obj_set_pos(g_tempCover, filled, 0);
-  lv_obj_set_size(g_tempCover, 210 - filled, 16);
+  static int lastFilled = -1;
+  if (filled != lastFilled) {
+    lastFilled = filled;
+    lv_obj_set_pos(g_tempCover, filled, 0);
+    lv_obj_set_size(g_tempCover, 210 - filled, 16);
+  }
 }
 
 void updateFuelBar(const Values& v) {
@@ -561,9 +595,8 @@ void updateFuelBar(const Values& v) {
   } else {
     snprintf(text, sizeof(text), "FUEL %% --");
   }
-  lv_label_set_text(g_fuelLabel, text);
-  lv_obj_set_style_text_color(g_fuelLabel, lv_color_hex(v.fuelWarning ? COL_RED : COL_TEXT),
-                              0);
+  setLabelText(g_fuelLabel, text);
+  setTextColor(g_fuelLabel, v.fuelWarning ? COL_RED : COL_TEXT);
 
   float frac = 0.0f;
   if (v.fuelValid) {
@@ -577,8 +610,12 @@ void updateFuelBar(const Values& v) {
   }
 
   const int filled = (int)(210.0f * frac);
-  lv_obj_set_pos(g_fuelCover, filled, 0);
-  lv_obj_set_size(g_fuelCover, 210 - filled, 16);
+  static int lastFilled = -1;
+  if (filled != lastFilled) {
+    lastFilled = filled;
+    lv_obj_set_pos(g_fuelCover, filled, 0);
+    lv_obj_set_size(g_fuelCover, 210 - filled, 16);
+  }
 }
 
 void clockTapCb(lv_event_t* /*e*/) {
@@ -774,15 +811,12 @@ void applyValues(const Values& v) {
   } else {
     snprintf(text, sizeof(text), "--.-V");
   }
-  lv_label_set_text(g_voltage, text);
+  setLabelText(g_voltage, text);
   const bool batteryOk = v.batteryValid && v.batteryV >= 11.0f && v.batteryV <= 15.0f;
-  lv_obj_set_style_text_color(g_voltage,
-                              lv_color_hex(v.batteryValid ? (batteryOk ? COL_GREEN : COL_RED)
-                                                          : COL_DIM),
-                              0);
+  setTextColor(g_voltage, v.batteryValid ? (batteryOk ? COL_GREEN : COL_RED) : COL_DIM);
 
   snprintf(text, sizeof(text), "%.1f km", v.odometerKm);
-  lv_label_set_text(g_odo, text);
+  setLabelText(g_odo, text);
 
   setIconState(g_iconOil, v.oilWarning);
   setIconState(g_iconChg, v.chargeWarning);

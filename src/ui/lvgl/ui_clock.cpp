@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 
 #include "lvgl.h"
@@ -162,9 +163,14 @@ void updateClock() {
   lv_line_set_points(g_minuteLine, g_minuteHand, 2);
   lv_line_set_points(g_secondLine, g_secondHand, 2);
 
+  static char lastText[8] = {};
   char text[8];
   snprintf(text, sizeof(text), "%02d:%02d", hour, minute);
-  lv_label_set_text(g_clockTime, text);
+  if (strcmp(lastText, text) != 0) {
+    strncpy(lastText, text, sizeof(lastText) - 1);
+    lastText[sizeof(lastText) - 1] = '\0';
+    lv_label_set_text(g_clockTime, text);
+  }
 }
 
 void hideClockSettings() {
