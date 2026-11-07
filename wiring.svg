@@ -65,7 +65,7 @@
   <text class="t" x="430" y="586" text-anchor="end" font-size="14">RX (GPIO44)</text>
   <circle cx="450" cy="581" r="6" fill="#6a1b9a"/>
 
-  <text class="note" x="60" y="645" font-size="13">I²C уже занята: GT911 (0x5D/0x14) и CH422G (0x20).</text>
+  <text class="note" x="60" y="645" font-size="13">I²C уже занята: GT911 (0x5D/0x14) и CH422G (0x24).</text>
   <text class="note" x="60" y="668" font-size="13">Свободный выведенный GPIO — GPIO6 (импульсы ABS).</text>
   <text class="note" x="60" y="691" font-size="13">12V-входы — только через оптопары/делители.</text>
 
@@ -241,7 +241,7 @@
   <rect x="40" y="835" width="460" height="125" rx="10" fill="#ffffff" stroke="#b0bec5" stroke-width="1.5"/>
   <text class="h" x="60" y="860" font-size="15">Питание и важное</text>
   <text class="note" x="60" y="884" font-size="12">3.3V/GND — с гребёнок платы на все модули.</text>
-  <text class="note" x="60" y="906" font-size="12">GT911 0x5D/0x14 · CH422G 0x20 · ADS1115 0x48 · MCP23017 0x21</text>
+  <text class="note" x="60" y="906" font-size="12">GT911 0x5D/0x14 · CH422G 0x24 · ADS1115 0x48 · MCP23017 0x21</text>
   <text class="note" x="60" y="928" font-size="12">1.6 D/TD: RPM с W-терминала генератора.</text>
   <text class="note" x="60" y="950" font-size="12">Скорость — ABS → GPIO6; тахометр 0–5500, красная с 4500.</text>
 </svg>
