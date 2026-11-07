@@ -3,6 +3,11 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+
+#if defined(ARDUINO)
+#include <esp_heap_caps.h>
+#endif
 
 #include "icons.h"
 #include "lvgl.h"
@@ -31,6 +36,8 @@ constexpr int kGaugeTicks = 32;
 struct Gauge {
   lv_obj_t* arc = nullptr;
   lv_obj_t* value = nullptr;
+  lv_obj_t* cover = nullptr;
+  uint32_t indicatorColor = 0xFFFFFFFFU;
   int32_t max = 0;
   bool div1000 = false;
   int segmentCount = 0;
@@ -89,7 +96,7 @@ bool g_bootSkipped = false;
 uint32_t g_bootStartMs = 0;
 bool g_selfTestActive = false;
 
-lv_obj_t* addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, int rInner,
+lv_obj_t* addTick(lv_obj_t* parent, int cx, int cy, float angleDeg, int rInner,
                   int rOuter, int width, uint32_t color) {
   if (g_tickPointCount >= kMaxTicks) {
     return nullptr;
@@ -102,10 +109,22 @@ lv_obj_t* addTick(lv_obj_t* parent, int size, int cx, int cy, float angleDeg, in
   points[1].x = (lv_coord_t)(cx + cosf(rad) * rOuter);
   points[1].y = (lv_coord_t)(cy + sinf(rad) * rOuter);
 
+  // Keep each tick object as small as its two endpoints. A full-gauge line
+  // object would make every color change invalidate the whole dial.
+  const int pad = width / 2 + 2;
+  const lv_coord_t x1 = LV_MIN(points[0].x, points[1].x) - pad;
+  const lv_coord_t y1 = LV_MIN(points[0].y, points[1].y) - pad;
+  const lv_coord_t x2 = LV_MAX(points[0].x, points[1].x) + pad;
+  const lv_coord_t y2 = LV_MAX(points[0].y, points[1].y) + pad;
+  points[0].x -= x1;
+  points[0].y -= y1;
+  points[1].x -= x1;
+  points[1].y -= y1;
+
   lv_obj_t* line = lv_line_create(parent);
   lv_line_set_points(line, points, 2);
-  lv_obj_set_size(line, size, size);
-  lv_obj_set_pos(line, 0, 0);
+  lv_obj_set_size(line, x2 - x1 + 1, y2 - y1 + 1);
+  lv_obj_set_pos(line, x1, y1);
   lv_obj_set_style_line_width(line, width, 0);
   lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
   lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
@@ -148,6 +167,19 @@ uint32_t rpmColor(float value) {
     return lerpColor(COL_YELLOW, COL_ORANGE, (value - 3500.0f) / 500.0f);
   }
   return lerpColor(COL_ORANGE, COL_RED, (value - 4000.0f) / 500.0f);
+}
+
+// A full-size gradient ring is pre-rendered into a canvas once. Updating the
+// tachometer then only redraws a small angular slice instead of the dozens of
+// overlapping arc objects it would take to build the gradient.
+void* allocGradientBuffer(size_t bytes) {
+#if defined(ARDUINO)
+  void* buf = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (buf != nullptr) {
+    return buf;
+  }
+#endif
+  return malloc(bytes);
 }
 
 Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
@@ -206,37 +238,95 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
   }
 
   if (segmentedFill && segStep > 0.0f) {
-    const int total = (int)((float)max / segStep + 0.5f);
-    for (int i = 0; i < total && g.segmentCount < 80; ++i) {
-      const float startValue = i * segStep;
-      const float endValue = fminf((i + 1) * segStep, (float)max);
-      const float startAngle = 135.0f + 270.0f * (startValue / (float)max);
-      const float endAngle = 135.0f + 270.0f * (endValue / (float)max);
-      const float midValue = (startValue + endValue) * 0.5f;
+    const size_t bufferSize =
+        LV_CANVAS_BUF_SIZE_TRUE_COLOR_ALPHA(size, size);
+    void* ringBuf = allocGradientBuffer(bufferSize);
 
-      uint32_t color = segTo;
-      if (colorFn != nullptr) {
-        color = colorFn(midValue);
-      } else if (midValue <= segStart) {
-        color = segFrom;
-      } else if (midValue < segEnd) {
-        color = lerpColor(segFrom, segTo, (midValue - segStart) / (segEnd - segStart));
+    if (ringBuf != nullptr) {
+      lv_obj_t* ring = lv_canvas_create(box);
+      lv_canvas_set_buffer(ring, ringBuf, size, size,
+                           LV_IMG_CF_TRUE_COLOR_ALPHA);
+      lv_obj_set_pos(ring, 0, 0);
+      lv_canvas_fill_bg(ring, lv_color_black(), LV_OPA_TRANSP);
+
+      lv_draw_arc_dsc_t arcDsc;
+      lv_draw_arc_dsc_init(&arcDsc);
+      arcDsc.width = arcWidth;
+      arcDsc.rounded = 0;
+      arcDsc.opa = LV_OPA_COVER;
+
+      const int total = (int)((float)max / segStep + 0.5f);
+      for (int i = 0; i < total; ++i) {
+        const float startValue = i * segStep;
+        const float endValue = fminf((i + 1) * segStep, (float)max);
+        const float startAngle = 135.0f + 270.0f * (startValue / (float)max);
+        const float endAngle = 135.0f + 270.0f * (endValue / (float)max);
+        const float midValue = (startValue + endValue) * 0.5f;
+
+        uint32_t color = segTo;
+        if (colorFn != nullptr) {
+          color = colorFn(midValue);
+        } else if (midValue <= segStart) {
+          color = segFrom;
+        } else if (midValue < segEnd) {
+          color =
+              lerpColor(segFrom, segTo, (midValue - segStart) / (segEnd - segStart));
+        }
+
+        arcDsc.color = lv_color_hex(color);
+        lv_canvas_draw_arc(ring, size / 2, size / 2, size / 2,
+                           (int32_t)startAngle, (int32_t)endAngle, &arcDsc);
       }
 
-      lv_obj_t* segment = lv_arc_create(box);
-      lv_obj_set_size(segment, size, size);
-      lv_obj_center(segment);
-      lv_arc_set_bg_angles(segment, (int32_t)startAngle, (int32_t)endAngle);
-      lv_obj_set_style_arc_width(segment, arcWidth, LV_PART_MAIN);
-      lv_obj_set_style_arc_color(segment, lv_color_hex(color), LV_PART_MAIN);
-      lv_obj_set_style_arc_rounded(segment, false, LV_PART_MAIN);
-      lv_obj_set_style_arc_opa(segment, LV_OPA_TRANSP, LV_PART_INDICATOR);
-      lv_obj_set_style_opa(segment, LV_OPA_TRANSP, LV_PART_KNOB);
-      lv_obj_clear_flag(segment, LV_OBJ_FLAG_CLICKABLE);
-      lv_obj_add_flag(segment, LV_OBJ_FLAG_HIDDEN);
-      g.segments[g.segmentCount++] = segment;
+      // Mask the part of the gradient above the current value with the track
+      // color. Only this arc changes while driving.
+      lv_obj_t* cover = lv_arc_create(box);
+      lv_obj_set_size(cover, size, size);
+      lv_obj_center(cover);
+      lv_arc_set_bg_angles(cover, 135, 45);
+      lv_obj_set_style_arc_width(cover, arcWidth, LV_PART_MAIN);
+      lv_obj_set_style_arc_color(cover, lv_color_hex(COL_TRACK), LV_PART_MAIN);
+      lv_obj_set_style_arc_rounded(cover, false, LV_PART_MAIN);
+      lv_obj_set_style_arc_opa(cover, LV_OPA_TRANSP, LV_PART_INDICATOR);
+      lv_obj_set_style_opa(cover, LV_OPA_TRANSP, LV_PART_KNOB);
+      lv_obj_clear_flag(cover, LV_OBJ_FLAG_CLICKABLE);
+      g.cover = cover;
+    } else {
+      // Canvas allocation failed (e.g. no PSRAM): fall back to one arc per
+      // segment. Correct, but redraws are much heavier.
+      const int total = (int)((float)max / segStep + 0.5f);
+      for (int i = 0; i < total && g.segmentCount < 80; ++i) {
+        const float startValue = i * segStep;
+        const float endValue = fminf((i + 1) * segStep, (float)max);
+        const float startAngle = 135.0f + 270.0f * (startValue / (float)max);
+        const float endAngle = 135.0f + 270.0f * (endValue / (float)max);
+        const float midValue = (startValue + endValue) * 0.5f;
+
+        uint32_t color = segTo;
+        if (colorFn != nullptr) {
+          color = colorFn(midValue);
+        } else if (midValue <= segStart) {
+          color = segFrom;
+        } else if (midValue < segEnd) {
+          color =
+              lerpColor(segFrom, segTo, (midValue - segStart) / (segEnd - segStart));
+        }
+
+        lv_obj_t* segment = lv_arc_create(box);
+        lv_obj_set_size(segment, size, size);
+        lv_obj_center(segment);
+        lv_arc_set_bg_angles(segment, (int32_t)startAngle, (int32_t)endAngle);
+        lv_obj_set_style_arc_width(segment, arcWidth, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(segment, lv_color_hex(color), LV_PART_MAIN);
+        lv_obj_set_style_arc_rounded(segment, false, LV_PART_MAIN);
+        lv_obj_set_style_arc_opa(segment, LV_OPA_TRANSP, LV_PART_INDICATOR);
+        lv_obj_set_style_opa(segment, LV_OPA_TRANSP, LV_PART_KNOB);
+        lv_obj_clear_flag(segment, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_flag(segment, LV_OBJ_FLAG_HIDDEN);
+        g.segments[g.segmentCount++] = segment;
+      }
+      g.segmentStep = segStep;
     }
-    g.segmentStep = segStep;
   }
 
   const int tickCount = (int)((float)max / tickStep + 0.5f);
@@ -251,7 +341,7 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
     const bool red = redlineFrac > 0.0f && frac >= redlineFrac;
     const uint32_t color = red ? COL_RED : (major ? COL_TICK : COL_DIM);
 
-    lv_obj_t* mark = addTick(box, size, size / 2, size / 2, angle,
+    lv_obj_t* mark = addTick(box, size / 2, size / 2, angle,
                              rOuter - (major ? 13 : 7), rOuter, major ? 3 : 2, color);
 
     const int markIndex = g.tickMarkCount;
@@ -310,7 +400,12 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent,
   if (arcValue > g.max) {
     arcValue = g.max;
   }
-  if (g.segmentCount > 0) {
+  if (g.cover != nullptr) {
+    int32_t coverStart =
+        135 + (int32_t)(270.0f * (float)arcValue / (float)g.max);
+    coverStart %= 360;
+    lv_arc_set_bg_angles(g.cover, (uint16_t)coverStart, 45);
+  } else if (g.segmentCount > 0) {
     int visible = 0;
     if (valid && g.segmentStep > 0.0f) {
       visible = (int)(value / g.segmentStep);
@@ -330,8 +425,13 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent,
     }
   } else {
     lv_arc_set_value(g.arc, arcValue);
-    lv_obj_set_style_arc_color(g.arc, lv_color_hex(valid ? accent : COL_TRACK),
-                               LV_PART_INDICATOR);
+    const uint32_t indicator = valid ? accent : COL_TRACK;
+    // Style setters invalidate the whole object, so only touch the color when
+    // it actually changes (normally never after the first frame).
+    if (indicator != g.indicatorColor) {
+      g.indicatorColor = indicator;
+      lv_obj_set_style_arc_color(g.arc, lv_color_hex(indicator), LV_PART_INDICATOR);
+    }
   }
 
   if (highlightReached && g.tickMarkCount > 0) {
@@ -366,8 +466,15 @@ void updateGauge(Gauge& g, float value, bool valid, uint32_t accent,
   lv_label_set_text(g.value, text);
 }
 
+void setImgOpa(lv_obj_t* obj, lv_opa_t opa) {
+  if (lv_obj_get_style_img_opa(obj, 0) == opa) {
+    return;
+  }
+  lv_obj_set_style_img_opa(obj, opa, 0);
+}
+
 void setIconState(lv_obj_t* icon, bool on) {
-  lv_obj_set_style_img_opa(icon, on ? LV_OPA_COVER : LV_OPA_20, 0);
+  setImgOpa(icon, on ? LV_OPA_COVER : LV_OPA_20);
 }
 
 lv_obj_t* createStatusIcon(lv_obj_t* parent, const lv_img_dsc_t* src, int x, int y) {
@@ -692,14 +799,14 @@ void applyValues(const Values& v) {
   setIconState(g_iconBrakeFault, showBrakeFault);
 
   if (v.highBeam) {
-    lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_0, 0);
-    lv_obj_set_style_img_opa(g_iconBeam, LV_OPA_COVER, 0);
+    setImgOpa(g_iconLowBeam, LV_OPA_0);
+    setImgOpa(g_iconBeam, LV_OPA_COVER);
   } else if (v.lowBeam) {
-    lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_COVER, 0);
-    lv_obj_set_style_img_opa(g_iconBeam, LV_OPA_0, 0);
+    setImgOpa(g_iconLowBeam, LV_OPA_COVER);
+    setImgOpa(g_iconBeam, LV_OPA_0);
   } else {
-    lv_obj_set_style_img_opa(g_iconLowBeam, LV_OPA_0, 0);
-    lv_obj_set_style_img_opa(g_iconBeam, LV_OPA_20, 0);
+    setImgOpa(g_iconLowBeam, LV_OPA_0);
+    setImgOpa(g_iconBeam, LV_OPA_20);
   }
 
   const bool blinkOn = g_selfTestActive ? true : (((lv_tick_get() / 350U) & 1U) == 0U);
