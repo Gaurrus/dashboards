@@ -16,6 +16,7 @@
 #include "ui_bye.h"
 #include "ui_clock.h"
 #include "ui_theme.h"
+#include "version.h"
 #include "vw_gif.h"
 
 using namespace ui::theme;
@@ -801,6 +802,11 @@ lv_obj_t* createSplash(lv_obj_t* parent) {
   lv_gif_set_src(gif, &vw_gif);
   lv_obj_align(gif, LV_ALIGN_CENTER, 0, 0);
   g_splashGif = gif;
+
+  lv_obj_t* versionLabel =
+      makeLabel(splash, "v" T3DASH_VERSION, &lv_font_montserrat_14, COL_DIM);
+  lv_obj_align(versionLabel, LV_ALIGN_BOTTOM_MID, 0, -14);
+  lv_obj_set_style_text_opa(versionLabel, LV_OPA_80, 0);
 
   lv_obj_move_foreground(splash);
   return splash;
