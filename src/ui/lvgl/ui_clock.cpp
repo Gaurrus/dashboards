@@ -37,6 +37,20 @@ void setHandPoints(lv_point_t* points, int size, float angleDeg, int length) {
   points[1].y = center - (lv_coord_t)(cosf(rad) * length);
 }
 
+bool pointsDiffer(const lv_point_t* a, const lv_point_t* b) {
+  return a[0].x != b[0].x || a[0].y != b[0].y || a[1].x != b[1].x ||
+         a[1].y != b[1].y;
+}
+
+void applyHand(lv_obj_t* line, lv_point_t* stored, const lv_point_t* next) {
+  if (!pointsDiffer(stored, next)) {
+    return;
+  }
+  stored[0] = next[0];
+  stored[1] = next[1];
+  lv_line_set_points(line, stored, 2);
+}
+
 void createClock(lv_obj_t* parent, int x, int y, int size) {
   lv_obj_t* box = lv_obj_create(parent);
   lv_obj_remove_style_all(box);
@@ -156,12 +170,15 @@ void updateClock() {
   const float minuteAngle = (minute + second / 60.0f) * 6.0f;
   const float secondAngle = second * 6.0f;
 
-  setHandPoints(g_hourHand, ui::internal::CLOCK_SIZE, hourAngle, 42);
-  setHandPoints(g_minuteHand, ui::internal::CLOCK_SIZE, minuteAngle, 62);
-  setHandPoints(g_secondHand, ui::internal::CLOCK_SIZE, secondAngle, 72);
-  lv_line_set_points(g_hourLine, g_hourHand, 2);
-  lv_line_set_points(g_minuteLine, g_minuteHand, 2);
-  lv_line_set_points(g_secondLine, g_secondHand, 2);
+  lv_point_t hourPoints[2];
+  lv_point_t minutePoints[2];
+  lv_point_t secondPoints[2];
+  setHandPoints(hourPoints, ui::internal::CLOCK_SIZE, hourAngle, 42);
+  setHandPoints(minutePoints, ui::internal::CLOCK_SIZE, minuteAngle, 62);
+  setHandPoints(secondPoints, ui::internal::CLOCK_SIZE, secondAngle, 72);
+  applyHand(g_hourLine, g_hourHand, hourPoints);
+  applyHand(g_minuteLine, g_minuteHand, minutePoints);
+  applyHand(g_secondLine, g_secondHand, secondPoints);
 
   static char lastText[8] = {};
   char text[8];
