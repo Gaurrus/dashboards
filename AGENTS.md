@@ -30,10 +30,12 @@
      (`memories_sh_add_memory`), чтобы они пережили сессию.
 
 3. **Обновить сборки в `dist/`**
-   - **Версия обязательна в имени файлов сборок.** Источник — `VERSION`
-     в корне репозитория.
+   - **Каждая версия — отдельная папка `dist/vX.Y.Z/`; версия также
+     остаётся в именах файлов.** Источник — `VERSION` в корне.
      ```bash
      VER=$(cat VERSION)
+     OUT="dist/v${VER}"
+     mkdir -p "$OUT"
      ```
    - Собрать свежий merged bin (прошивка по адресу `0x0`):
      ```bash
@@ -41,10 +43,12 @@
      ~/.platformio-venv/bin/pio run -e BOARD_WAVESHARE_ESP32_S3_TOUCH_LCD_7
      cd ..
      VER=$(cat VERSION)
+     OUT="dist/v${VER}"
+     mkdir -p "$OUT"
      B=waveshare/.pio/build/BOARD_WAVESHARE_ESP32_S3_TOUCH_LCD_7
      ~/.platformio-venv/bin/python ~/.platformio/packages/tool-esptoolpy/esptool.py \
        --chip esp32s3 merge_bin \
-       -o "dist/t3-dash-waveshare-7-16MB-v${VER}.bin" \
+       -o "$OUT/t3-dash-waveshare-7-16MB-v${VER}.bin" \
        --flash_mode qio --flash_freq 80m --flash_size 16MB \
        0x0 "$B/bootloader.bin" \
        0x8000 "$B/partitions.bin" \
@@ -54,21 +58,23 @@
    - Пересобрать архив Arduino-скетча:
      ```bash
      VER=$(cat VERSION)
-     rm -f "dist/t3-dash-arduino-sketch-v${VER}.zip"
-     (cd arduino && zip -r -X "../dist/t3-dash-arduino-sketch-v${VER}.zip" t3-dash -x '*.DS_Store')
+     OUT="dist/v${VER}"
+     mkdir -p "$OUT"
+     rm -f "$OUT/t3-dash-arduino-sketch-v${VER}.zip"
+     (cd arduino && zip -r -X "../${OUT}/t3-dash-arduino-sketch-v${VER}.zip" t3-dash -x '*.DS_Store')
      ```
    - Удалить/не создавать безверсионные копии в `dist/`.
    - Сформировать манифест релиза:
      ```bash
      python3 scripts/make_dist_manifest.py
      ```
-     Получится `dist/t3-dash-v${VER}.json` с версией, git-коммитом,
+     Получится `dist/v${VER}/t3-dash-v${VER}.json` с версией, git-коммитом,
      SHA-256 и адресом прошивки.
    - В ответе указать SHA-256 обоих файлов:
      ```bash
      VER=$(cat VERSION)
-     shasum -a 256 "dist/t3-dash-waveshare-7-16MB-v${VER}.bin" \
-                   "dist/t3-dash-arduino-sketch-v${VER}.zip"
+     shasum -a 256 "dist/v${VER}/t3-dash-waveshare-7-16MB-v${VER}.bin" \
+                   "dist/v${VER}/t3-dash-arduino-sketch-v${VER}.zip"
      ```
 
 4. **Сделать превью-скриншот self-check**
@@ -77,6 +83,7 @@
    ./build/t3dash_sim /tmp/selfcheck.bmp sweep
    sips -s format png /tmp/selfcheck.bmp --out preview-selfcheck.png
    ```
+
    - Файл: `sim/preview-selfcheck.png` (игнорируется правилом `sim/preview*.png`).
    - Для максимального self-test использовать режим `hot`:
      `./build/t3dash_sim /tmp/selfcheck.bin hot`.
@@ -104,9 +111,10 @@
 - Версия попадает в прошивку: Serial при старте печатает
   `VW T3 dashboard v<VER>...`; `t3dash_sim --version` показывает версию
   симулятора.
-- Для сборок в `dist/` версия обязательна в имени файла:
+- Сборки `dist/` группируются по версиям: `dist/vMAJOR.MINOR.PATCH/`;
+  внутри версия обязательна и в именах файлов:
   `...-vMAJOR.MINOR.PATCH.bin` / `...-vMAJOR.MINOR.PATCH.zip`;
-  манифест — `dist/t3-dash-vMAJOR.MINOR.PATCH.json`.
+  манифест — `dist/vMAJOR.MINOR.PATCH/t3-dash-vMAJOR.MINOR.PATCH.json`.
 - Релизный коммит помечать аннотированным тегом `vMAJOR.MINOR.PATCH`.
 - В `HANDOFF.md` фиксировать `Версия: old → new`.
 - Не понижать версию и не пропускать патч.
@@ -122,7 +130,7 @@
   поведения/команд.
 - `HANDOFF.md` — локальный контекст текущей сессии: последние изменения,
   проверки, что осталось на железе. В git не коммитится.
-- `HANDOFF-archive.md` — локальный архив старых сессионных записей, в `.gitignore`.
+- `archive/` — локальная папка для архивных файлов (например, `archive/HANDOFF-archive.md`), в `.gitignore`.
 - Memories (`memories.sh`) — долговременные правила и факты для агентов:
   pinout, адреса, команды, ограничения. Не заменяет README.
 
@@ -132,4 +140,5 @@
   пропустить; README/HANDOFF обновлять всегда, версия — патч.
 - Не запускать два `pio`-билда одновременно.
 - Перед коммитом загружать скил `git-conventions` и следовать ему.
+- При запросе влить в main делать через PR merge-commit стратегия
 - Секреты, токены и локальные пути не коммитить.

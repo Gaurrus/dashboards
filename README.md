@@ -7,12 +7,12 @@
 UI — **LVGL 8.4.0**. В репозитории есть PC-симулятор 800×480 на SDL2,
 прошивка Waveshare и скетч для Arduino IDE.
 
-Текущая версия: **1.0.0** (`VERSION`).
+Текущая версия: **1.0.1** (`VERSION`).
 
 ## Возможности
 
 - Boot-заставка VW, self-test ламп и шкал, переход к приборке.
-- Аналоговые часы + цифровое время; настройка времени тапом.
+- Аналоговые часы + цифровое время; настройка времени тапом, 00:00–23:59.
 - Спидометр 0–180 км/ч, тахометр 0–5500 об/мин с красной зоной.
 - TEMP/FUEL с градиентными шкалами и предупреждениями.
 - Вольтметр, одометр, индикаторы: масло, заряд, свечи, ближний/дальний,
@@ -20,6 +20,7 @@ UI — **LVGL 8.4.0**. В репозитории есть PC-симулятор 
 - Свайп по правому краю — программная яркость (подсветка Waveshare только вкл/выкл).
 - Бай-бай экран при выключении зажигания.
 - Удержание в центре спидометра — выбор цвета дуги (`ARC COLOR`).
+- Версия прошивки мелким шрифтом на экране приветствия (`v1.0.1`).
 - Демо-режим на Waveshare; реальные датчики подключаются по схеме ниже.
 
 ## Железо
@@ -64,7 +65,7 @@ src/
   hal/                   hal.h, hal_sim.cpp, hal_real.cpp
   logic/                 model.cpp, calibration.cpp
   ui/lvgl/               UI-модули LVGL: ui_lvgl, ui_clock, ui_brightness, ui_bye
-  ui/dashboard.cpp       старый TFT-UI для Wokwi
+  ui/dashboard.cpp       старый TFT-UI (legacy)
 assets/                  иконки, GIF, C-массивы
 sim/                     PC-симулятор LVGL + SDL2
 waveshare/               PlatformIO-проект Waveshare 7"
@@ -126,7 +127,7 @@ cd waveshare
 ~/.platformio-venv/bin/pio run -e BOARD_WAVESHARE_ESP32_S3_TOUCH_LCD_7 -t upload
 ```
 
-Готовый merged bin (шить по адресу `0x0`) лежит в `dist/` с версией в имени.
+Готовый merged bin (шить по адресу `0x0`) лежит в `dist/vX.Y.Z/` с версией в имени.
 
 ### Arduino IDE
 
@@ -141,15 +142,14 @@ cd waveshare
 ./scripts/sync_arduino.sh
 ```
 
-### Прототип / Wokwi
+### Legacy-прототип (ESP32 DevKit)
+
+Wokwi и связанные с ним файлы удалены. Остался старый TFT-UI для
+ESP32 DevKit — он не используется Waveshare/Arduino/sim:
 
 ```bash
-cd /Users/garrus/Arduino/t3-dash
-~/.platformio-venv/bin/pio run -e wokwi
 ~/.platformio-venv/bin/pio run -e hardware
 ```
-
-Это старый TFT-UI на ESP32 DevKit, не Waveshare.
 
 ## Версионирование и релизы
 
@@ -166,14 +166,15 @@ PlatformIO Waveshare делает это автоматически (`extra_scri
 симулятора — через custom command.
 
 - Версия печатается в Serial при старте и доступна в `t3dash_sim --version`.
-- Сборки в `dist/` обязаны иметь версию в имени:
-  `t3-dash-waveshare-7-16MB-v1.0.0.bin`,
-  `t3-dash-arduino-sketch-v1.0.0.zip`.
+- Каждая версия — отдельная папка `dist/vX.Y.Z/`; версия также остаётся
+  в именах файлов:
+  `dist/v1.0.1/t3-dash-waveshare-7-16MB-v1.0.1.bin`,
+  `dist/v1.0.1/t3-dash-arduino-sketch-v1.0.1.zip`.
 - Манифест релиза:
 
 ```bash
 python3 scripts/make_dist_manifest.py
-# dist/t3-dash-v1.0.0.json
+# dist/v1.0.1/t3-dash-v1.0.1.json
 ```
 
 - Релизный коммит помечается тегом `vMAJOR.MINOR.PATCH`.

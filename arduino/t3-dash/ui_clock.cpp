@@ -228,14 +228,14 @@ lv_obj_t* createClockSettings() {
   static char minuteOptions[60 * 3 + 1];
 
   int pos = 0;
-  for (int i = 0; i < 24 && pos < (int)sizeof(hourOptions) - 4; ++i) {
+  for (int i = 0; i < 24 && pos + 3 < (int)sizeof(hourOptions); ++i) {
     pos += snprintf(hourOptions + pos, sizeof(hourOptions) - pos, "%02d\n", i);
   }
   if (pos > 0) {
     hourOptions[pos - 1] = '\0';
   }
   pos = 0;
-  for (int i = 0; i < 60 && pos < (int)sizeof(minuteOptions) - 4; ++i) {
+  for (int i = 0; i < 60 && pos + 3 < (int)sizeof(minuteOptions); ++i) {
     pos += snprintf(minuteOptions + pos, sizeof(minuteOptions) - pos, "%02d\n", i);
   }
   if (pos > 0) {

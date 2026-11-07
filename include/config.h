@@ -3,19 +3,6 @@
 
 namespace cfg {
 
-// ===================== Simulation (Wokwi) pins =====================
-constexpr int PIN_ADC_SPEED = 34;
-constexpr int PIN_ADC_RPM   = 35;
-constexpr int PIN_ADC_TEMP  = 36;
-constexpr int PIN_ADC_FUEL  = 39;
-
-constexpr int PIN_BTN_OIL    = 25;
-constexpr int PIN_BTN_BEAM   = 26;
-constexpr int PIN_BTN_TURN_L = 27;
-constexpr int PIN_BTN_BRAKE  = 5;   // Wokwi: parking brake switch
-constexpr int PIN_BTN_BRAKE_FAULT = 13;  // Wokwi: low fluid / circuit failure
-
-// Shared between simulation and real board.
 constexpr int PIN_BUZZER = 33;
 
 // ===================== Real board pins =====================

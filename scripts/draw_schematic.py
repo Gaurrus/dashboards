@@ -2,9 +2,14 @@
 """Generate the VW T3 dashboard schematic (SVG).
 
     python3 scripts/draw_schematic.py
-    rsvg-convert -w 2400 schematic.svg -o schematic.png
+    rsvg-convert -w 2400 hardware/schematic.svg -o hardware/schematic.png
 """
 from __future__ import annotations
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+OUT = ROOT / "hardware" / "schematic.svg"
 
 W, H = 2400, 2000
 parts: list[str] = []
@@ -649,7 +654,7 @@ text(60, 1832, "Q1/Q3 — фототранзисторы PC817 внутри OPT1
 text(60, 1848, "Оптроны разрывают сигнальные цепи; при общем GND buck полной гальванической изоляции нет.", cls="note", size=8)
 
 # ------------------------------------------------------------------ netlist
-card(1560, 1200, 800, 660, "Netlist и правила", "ключевые цепи; полный список — wiring.json")
+card(1560, 1200, 800, 660, "Netlist и правила", "ключевые цепи; полный список — hardware/wiring.json")
 notes = [
     ("+12V_CAR", "J_PWR.1 → F1"),
     ("+12V_F", "F1 → D1 → U6.IN+, R11, R1, D4"),
@@ -715,6 +720,6 @@ svg = f'''<?xml version="1.0" encoding="UTF-8"?>
 {chr(10).join(parts)}
 </svg>
 '''
-with open("schematic.svg", "w", encoding="utf-8") as f:
-    f.write(svg)
-print("wrote schematic.svg")
+OUT.parent.mkdir(parents=True, exist_ok=True)
+OUT.write_text(svg, encoding="utf-8")
+print(f"wrote {OUT}")
