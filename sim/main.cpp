@@ -4,11 +4,13 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 
 #include "demo_values.h"
 #include "lvgl.h"
 #include "ui_lvgl.h"
+#include "version.h"
 
 namespace {
 
@@ -248,6 +250,11 @@ void saveBmp(const char* path) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  if (argc >= 2 && strcmp(argv[1], "--version") == 0) {
+    printf("%s\n", T3DASH_VERSION);
+    return 0;
+  }
+
   const bool screenshot = argc >= 2;
   const bool viaSdl = argc >= 3 && SDL_strcmp(argv[2], "sdl") == 0;
   const bool bootShot = argc >= 3 && SDL_strcmp(argv[2], "boot") == 0;
@@ -511,7 +518,7 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  printf("VW T3 dashboard simulator (ESP32-S3 emulation: 16-bit color, 6 MB LVGL heap, 30 FPS).\n");
+  printf("VW T3 dashboard simulator v%s (ESP32-S3 emulation: 16-bit color, 6 MB LVGL heap, 30 FPS).\n", T3DASH_VERSION);
   printf("Esc exits, I toggles ignition, P toggles FPS/CPU/RAM overlay.\n");
   fflush(stdout);
 

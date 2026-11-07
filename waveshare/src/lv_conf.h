@@ -80,7 +80,7 @@
  *====================*/
 
 /*Default display refresh period. LVG will redraw changed areas with this period time*/
-#define LV_DISP_DEF_REFR_PERIOD 30      /*[ms]*/
+#define LV_DISP_DEF_REFR_PERIOD 25      /*[ms]*/
 
 /*Input device read period in milliseconds*/
 #define LV_INDEV_DEF_READ_PERIOD 30     /*[ms]*/
@@ -231,8 +231,10 @@
  * Logging
  *-----------*/
 
-/*Enable the log module*/
-#define LV_USE_LOG 1
+/*Enable the log module (override with -DLV_USE_LOG=1)*/
+#ifndef LV_USE_LOG
+#define LV_USE_LOG 0
+#endif
 #if LV_USE_LOG
 
     /*How important log should be added:
@@ -280,8 +282,10 @@
  * Others
  *-----------*/
 
-/*1: Show CPU usage and FPS count*/
-#define LV_USE_PERF_MONITOR 1
+/*1: Show CPU usage and FPS count (override with -DLV_USE_PERF_MONITOR=1)*/
+#ifndef LV_USE_PERF_MONITOR
+#define LV_USE_PERF_MONITOR 0
+#endif
 #if LV_USE_PERF_MONITOR
     #define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_RIGHT
 #endif

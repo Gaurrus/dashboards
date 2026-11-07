@@ -16,6 +16,7 @@
 #include "demo_values.h"
 #include "lvgl_v8_port.h"
 #include "ui_lvgl.h"
+#include "version.h"
 
 using namespace esp_panel::drivers;
 using namespace esp_panel::board;
@@ -76,7 +77,7 @@ void demoUpdateCb(lv_timer_t* /*timer*/) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("VW T3 dashboard: Waveshare ESP32-S3-Touch-LCD-7");
+  Serial.printf("VW T3 dashboard v%s: Waveshare ESP32-S3-Touch-LCD-7\n", T3DASH_VERSION);
 
   Board* board = new Board();
   board->init();
