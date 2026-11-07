@@ -178,6 +178,14 @@ uint32_t rpmColor(float value) {
 // overlapping arc objects it would take to build the gradient.
 void* allocGradientBuffer(size_t bytes) {
 #if defined(ARDUINO)
+  // Prefer internal RAM when there is enough headroom left; fall back to PSRAM.
+  constexpr size_t kInternalReserve = 64 * 1024;
+  if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) > bytes + kInternalReserve) {
+    void* buf = heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (buf != nullptr) {
+      return buf;
+    }
+  }
   void* buf = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (buf != nullptr) {
     return buf;
