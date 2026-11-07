@@ -32,16 +32,16 @@
       "type": "mcp23017",
       "attrs": {
         "address": "0x21",
-        "note": "A0=1, A1=0, A2=0; 0x20 занят CH422G"
+        "note": "A0=1, A1=0, A2=0; 0x24 занят CH422G"
       }
     },
     {
       "id": "opto",
       "type": "optocoupler-16ch",
       "attrs": {
-        "input": "12V active-high (1k/2W + reverse diode)",
+        "input": "12V high-side или low-side (по каналу), 1k/2W + reverse diode",
         "output": "open collector, active-low",
-        "note": "1 канал на каждый 12V-вход; выходы на MCP23017"
+        "note": "1 канал на каждый 12V-вход; выходы open-collector active-low на MCP23017"
       }
     },
     {
@@ -85,7 +85,8 @@
       "attrs": {
         "input": "W-терминал генератора (AC, дизель 1.6 D/TD)",
         "output": "0..3.3V -> ADS1115 A3",
-        "note": "перед входом делитель/защита; калибровка по передаточному отношению шкивов"
+        "note": "LM2917N-8; Rdrop 470Ω 1W, C1=3.3nF, R1=100k, C2=1µF; выход 0..3.3V -> ADS1115 A3",
+        "type": "lm2917n-8-frequency-to-voltage"
       }
     },
     {
@@ -94,7 +95,8 @@
       "attrs": {
         "input": "индуктивный датчик ABS (2 провода, гребёнка)",
         "output": "квадратный сигнал 3.3V -> GPIO6 (PCNT)",
-        "note": "LM393 с гистерезисом или LM1815; если ABS ECU даёт готовый square-wave — оптопара"
+        "note": "LM1815N (mode 3, 3.3V) для индуктивного датчика; иначе — оптопара/делитель для square-wave от ABS ECU",
+        "type": "lm1815-vr-conditioner"
       }
     },
     {
@@ -107,92 +109,542 @@
     }
   ],
   "connections": [
-    ["board:I2C_3V3", "ads:VDD", "red", ["3.3V only"]],
-    ["board:I2C_GND", "ads:GND", "black", []],
-    ["board:I2C_3V3", "mcp:VDD", "red", ["3.3V only"]],
-    ["board:I2C_GND", "mcp:GND", "black", []],
-
-    ["board:I2C_SDA", "ads:SDA", "blue", ["GPIO8"]],
-    ["board:I2C_SCL", "ads:SCL", "yellow", ["GPIO9"]],
-    ["board:I2C_SDA", "mcp:SDA", "blue", ["GPIO8"]],
-    ["board:I2C_SCL", "mcp:SCL", "yellow", ["GPIO9"]],
-
-    ["ads:ADDR", "ads:GND", "black", ["address 0x48"]],
-    ["mcp:A0", "mcp:VDD", "red", ["address 0x21, A0=1"]],
-    ["mcp:A1", "mcp:GND", "black", ["A1=0"]],
-    ["mcp:A2", "mcp:GND", "black", ["A2=0"]],
-    ["mcp:RESET", "mcp:VDD", "red", ["or 10k pull-up"]],
-
-    ["ads:A0", "batDiv:OUT", "green", ["battery voltage"]],
-    ["ads:A1", "coolant:SIG", "green", ["coolant/CHT"]],
-    ["ads:A2", "fuel:SIG", "green", ["fuel level"]],
-    ["ads:A3", "rpmFv:OUT", "green", ["RPM: W-терминал -> LM2917 -> A3"]],
-    ["board:I2C_3V3", "rpmFv:VDD", "red", []],
-    ["board:I2C_GND", "rpmFv:GND", "black", []],
-    ["rpmFv:IN", "signal:alternatorW", "orange", ["AC с W-терминала генератора"]],
-
-    ["opto:OUT1", "mcp:GPA0", "green", ["oil pressure warning"]],
-    ["opto:OUT2", "mcp:GPA1", "green", ["charge warning"]],
-    ["opto:OUT3", "mcp:GPA2", "green", ["high beam"]],
-    ["opto:OUT4", "mcp:GPA3", "green", ["low beam"]],
-    ["opto:OUT5", "mcp:GPA4", "green", ["turn left"]],
-    ["opto:OUT6", "mcp:GPA5", "green", ["turn right"]],
-    ["opto:OUT7", "mcp:GPA6", "green", ["glow plug"]],
-    ["opto:OUT8", "mcp:GPA7", "green", ["ignition on"]],
-    ["opto:OUT9", "mcp:GPB0", "green", ["parking brake (handbrake switch)"]],
-    ["opto:OUT10", "mcp:GPB1", "green", ["oil pressure 1.8 bar (optional, 1.6 TD)"]],
-    ["opto:OUT11", "mcp:GPB2", "green", ["brake fault: low fluid / circuit failure"]],
-
-    ["opto:BOARD_GND", "board:I2C_GND", "black", ["output side"]],
-    ["opto:CAR_GND", "car:GND", "black", ["input side; isolated from board GND"]],
-    ["opto:IN1", "signal:oil", "orange", ["12V active-high"]],
-    ["opto:IN2", "signal:charge", "orange", ["12V active-high"]],
-    ["opto:IN3", "signal:highBeam", "orange", ["12V active-high"]],
-    ["opto:IN4", "signal:lowBeam", "orange", ["12V active-high"]],
-    ["opto:IN5", "signal:turnLeft", "orange", ["12V active-high"]],
-    ["opto:IN6", "signal:turnRight", "orange", ["12V active-high"]],
-    ["opto:IN7", "signal:glowPlug", "orange", ["12V active-high"]],
-    ["opto:IN8", "signal:ignition", "orange", ["12V active-high"]],
-    ["opto:IN9", "signal:parkingBrake", "orange", ["12V active-high, make-to-ground handbrake switch"]],
-    ["opto:IN10", "signal:oilHigh", "orange", ["12V active-high, optional 1.8 bar"]],
-    ["opto:IN11", "signal:brakeFault", "orange", ["12V active-high, fluid level / pressure differential switch"]],
-
-    ["board:I2C_3V3", "absCond:VDD", "red", ["conditioner supply"]],
-    ["board:I2C_GND", "absCond:GND", "black", ["common ground"]],
-    ["absCond:OUT", "board:SENSOR_ADC", "green", ["GPIO6: ABS speed pulses (PCNT)"]],
-    ["absCond:IN", "signal:absSensor+", "orange", ["inductive ABS sensor"]],
-    ["absCond:GND", "signal:absSensor-", "black", ["sensor return / car ground"]],
-
-    ["board:UART2_3V3", "gps:VCC", "red", ["3.3V module only"]],
-    ["board:UART2_GND", "gps:GND", "black", []],
-    ["board:UART2_TX", "gps:RX", "green", ["GPIO43"]],
-    ["board:UART2_RX", "gps:TX", "green", ["GPIO44"]],
-
-    ["mcp:GPB7", "bz:IN", "green", ["optional buzzer"]],
-    ["bz:GND", "board:I2C_GND", "black", []]
+    [
+      "board:I2C_3V3",
+      "ads:VDD",
+      "red",
+      [
+        "3.3V only"
+      ]
+    ],
+    [
+      "board:I2C_GND",
+      "ads:GND",
+      "black",
+      []
+    ],
+    [
+      "board:I2C_3V3",
+      "mcp:VDD",
+      "red",
+      [
+        "3.3V only"
+      ]
+    ],
+    [
+      "board:I2C_GND",
+      "mcp:GND",
+      "black",
+      []
+    ],
+    [
+      "board:I2C_SDA",
+      "ads:SDA",
+      "blue",
+      [
+        "GPIO8"
+      ]
+    ],
+    [
+      "board:I2C_SCL",
+      "ads:SCL",
+      "yellow",
+      [
+        "GPIO9"
+      ]
+    ],
+    [
+      "board:I2C_SDA",
+      "mcp:SDA",
+      "blue",
+      [
+        "GPIO8"
+      ]
+    ],
+    [
+      "board:I2C_SCL",
+      "mcp:SCL",
+      "yellow",
+      [
+        "GPIO9"
+      ]
+    ],
+    [
+      "ads:ADDR",
+      "ads:GND",
+      "black",
+      [
+        "address 0x48"
+      ]
+    ],
+    [
+      "mcp:A0",
+      "mcp:VDD",
+      "red",
+      [
+        "address 0x21, A0=1"
+      ]
+    ],
+    [
+      "mcp:A1",
+      "mcp:GND",
+      "black",
+      [
+        "A1=0"
+      ]
+    ],
+    [
+      "mcp:A2",
+      "mcp:GND",
+      "black",
+      [
+        "A2=0"
+      ]
+    ],
+    [
+      "mcp:RESET",
+      "mcp:VDD",
+      "red",
+      [
+        "or 10k pull-up"
+      ]
+    ],
+    [
+      "ads:A0",
+      "batDiv:OUT",
+      "green",
+      [
+        "battery voltage"
+      ]
+    ],
+    [
+      "ads:A1",
+      "coolant:SIG",
+      "green",
+      [
+        "coolant/CHT"
+      ]
+    ],
+    [
+      "ads:A2",
+      "fuel:SIG",
+      "green",
+      [
+        "fuel level"
+      ]
+    ],
+    [
+      "ads:A3",
+      "rpmFv:OUT",
+      "green",
+      [
+        "RPM: W-терминал -> LM2917 -> A3"
+      ]
+    ],
+    [
+      "board:I2C_3V3",
+      "rpmFv:VDD",
+      "red",
+      []
+    ],
+    [
+      "board:I2C_GND",
+      "rpmFv:GND",
+      "black",
+      []
+    ],
+    [
+      "rpmFv:IN",
+      "signal:alternatorW",
+      "orange",
+      [
+        "AC с W-терминала генератора"
+      ]
+    ],
+    [
+      "opto:OUT1",
+      "mcp:GPA0",
+      "green",
+      [
+        "oil pressure warning"
+      ]
+    ],
+    [
+      "opto:OUT2",
+      "mcp:GPA1",
+      "green",
+      [
+        "charge warning"
+      ]
+    ],
+    [
+      "opto:OUT3",
+      "mcp:GPA2",
+      "green",
+      [
+        "high beam"
+      ]
+    ],
+    [
+      "opto:OUT4",
+      "mcp:GPA3",
+      "green",
+      [
+        "low beam"
+      ]
+    ],
+    [
+      "opto:OUT5",
+      "mcp:GPA4",
+      "green",
+      [
+        "turn left"
+      ]
+    ],
+    [
+      "opto:OUT6",
+      "mcp:GPA5",
+      "green",
+      [
+        "turn right"
+      ]
+    ],
+    [
+      "opto:OUT7",
+      "mcp:GPA6",
+      "green",
+      [
+        "glow plug"
+      ]
+    ],
+    [
+      "opto:OUT8",
+      "mcp:GPA7",
+      "green",
+      [
+        "ignition on"
+      ]
+    ],
+    [
+      "opto:OUT9",
+      "mcp:GPB0",
+      "green",
+      [
+        "parking brake (handbrake switch)"
+      ]
+    ],
+    [
+      "opto:OUT10",
+      "mcp:GPB1",
+      "green",
+      [
+        "oil pressure 1.8 bar (optional, 1.6 TD)"
+      ]
+    ],
+    [
+      "opto:OUT11",
+      "mcp:GPB2",
+      "green",
+      [
+        "brake fault: low fluid / circuit failure"
+      ]
+    ],
+    [
+      "opto:BOARD_GND",
+      "board:I2C_GND",
+      "black",
+      [
+        "output side"
+      ]
+    ],
+    [
+      "opto:CAR_GND",
+      "car:GND",
+      "black",
+      [
+        "input side; isolated from board GND"
+      ]
+    ],
+    [
+      "opto:IN1",
+      "signal:oil",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN2",
+      "signal:charge",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN3",
+      "signal:highBeam",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN4",
+      "signal:lowBeam",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN5",
+      "signal:turnLeft",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN6",
+      "signal:turnRight",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN7",
+      "signal:glowPlug",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN8",
+      "signal:ignition",
+      "orange",
+      [
+        "12V active-high"
+      ]
+    ],
+    [
+      "opto:IN9",
+      "signal:parkingBrake",
+      "orange",
+      [
+        "12V active-high, make-to-ground handbrake switch"
+      ]
+    ],
+    [
+      "opto:IN10",
+      "signal:oilHigh",
+      "orange",
+      [
+        "12V active-high, optional 1.8 bar"
+      ]
+    ],
+    [
+      "opto:IN11",
+      "signal:brakeFault",
+      "orange",
+      [
+        "12V active-high, fluid level / pressure differential switch"
+      ]
+    ],
+    [
+      "board:I2C_3V3",
+      "absCond:VDD",
+      "red",
+      [
+        "conditioner supply"
+      ]
+    ],
+    [
+      "board:I2C_GND",
+      "absCond:GND",
+      "black",
+      [
+        "common ground"
+      ]
+    ],
+    [
+      "absCond:OUT",
+      "board:SENSOR_ADC",
+      "green",
+      [
+        "GPIO6: ABS speed pulses (PCNT)"
+      ]
+    ],
+    [
+      "absCond:IN",
+      "signal:absSensor+",
+      "orange",
+      [
+        "inductive ABS sensor"
+      ]
+    ],
+    [
+      "absCond:GND",
+      "signal:absSensor-",
+      "black",
+      [
+        "sensor return / car ground"
+      ]
+    ],
+    [
+      "board:UART2_3V3",
+      "gps:VCC",
+      "red",
+      [
+        "3.3V module only"
+      ]
+    ],
+    [
+      "board:UART2_GND",
+      "gps:GND",
+      "black",
+      []
+    ],
+    [
+      "board:UART2_TX",
+      "gps:RX",
+      "green",
+      [
+        "GPIO43"
+      ]
+    ],
+    [
+      "board:UART2_RX",
+      "gps:TX",
+      "green",
+      [
+        "GPIO44"
+      ]
+    ],
+    [
+      "mcp:GPB7",
+      "bz:IN",
+      "green",
+      [
+        "optional buzzer"
+      ]
+    ],
+    [
+      "bz:GND",
+      "board:I2C_GND",
+      "black",
+      []
+    ]
   ],
   "signals": [
-    { "name": "batteryV", "source": "АКБ 12..15V", "input": "ADS1115 A0", "note": "делитель 100k/22k" },
-    { "name": "coolantC", "source": "датчик температуры/CHT", "input": "ADS1115 A1", "note": "2.2k pull-up" },
-    { "name": "fuelPct", "source": "датчик уровня топлива", "input": "ADS1115 A2", "note": "150R pull-up" },
-    { "name": "rpm", "source": "W-терминал генератора (1.6 D/TD)", "input": "ADS1115 A3 через LM2917", "note": "F/V; калибровка по шкивам" },
-    { "name": "vehicleSpeed", "source": "ABS-датчик/гребёнка", "input": "GPIO6 (PCNT)", "note": "калибровка по числу зубьев и окружности колеса" },
-    { "name": "gps", "source": "NEO-6M (опционально)", "input": "UART2 GPIO43/44", "note": "время/одометр, не скорость" },
-    { "name": "oilWarning", "source": "12V лампа масла", "input": "MCP23017 GPA0", "note": "active-low после оптопары" },
-    { "name": "chargeWarning", "source": "12V лампа заряда", "input": "MCP23017 GPA1", "note": "active-low" },
-    { "name": "highBeam", "source": "12V дальний свет", "input": "MCP23017 GPA2", "note": "active-low" },
-    { "name": "lowBeam", "source": "12V ближний свет", "input": "MCP23017 GPA3", "note": "active-low" },
-    { "name": "turnLeft", "source": "12V поворотник L", "input": "MCP23017 GPA4", "note": "active-low" },
-    { "name": "turnRight", "source": "12V поворотник R", "input": "MCP23017 GPA5", "note": "active-low" },
-    { "name": "glowPlug", "source": "12V свечи накала", "input": "MCP23017 GPA6", "note": "active-low" },
-    { "name": "ignition", "source": "12V клемма 15 (зажигание)", "input": "MCP23017 GPA7", "note": "active-low" },
-    { "name": "oilHigh", "source": "12V 1.8 бар (1.6 TD)", "input": "MCP23017 GPB1", "note": "опционально" },
-    { "name": "parkingBrake", "source": "концевик ручника (замыкает на массу)", "input": "MCP23017 GPB0", "note": "отдельный вход; в UI — иконка (P)" },
-    { "name": "brakeFault", "source": "датчик уровня жидкости / дифференциальный датчик давления", "input": "MCP23017 GPB2", "note": "отдельный вход; в UI — иконка brake failure" }
+    {
+      "name": "batteryV",
+      "source": "АКБ 12..15V",
+      "input": "ADS1115 A0",
+      "note": "делитель 100k/22k"
+    },
+    {
+      "name": "coolantC",
+      "source": "датчик температуры/CHT",
+      "input": "ADS1115 A1",
+      "note": "2.2k pull-up"
+    },
+    {
+      "name": "fuelPct",
+      "source": "датчик уровня топлива",
+      "input": "ADS1115 A2",
+      "note": "150R pull-up"
+    },
+    {
+      "name": "rpm",
+      "source": "W-терминал генератора (1.6 D/TD)",
+      "input": "ADS1115 A3 через LM2917",
+      "note": "F/V; калибровка по шкивам"
+    },
+    {
+      "name": "vehicleSpeed",
+      "source": "ABS-датчик/гребёнка",
+      "input": "GPIO6 (PCNT)",
+      "note": "калибровка по числу зубьев и окружности колеса"
+    },
+    {
+      "name": "gps",
+      "source": "NEO-6M (опционально)",
+      "input": "UART2 GPIO43/44",
+      "note": "время/одометр, не скорость"
+    },
+    {
+      "name": "oilWarning",
+      "source": "12V лампа масла",
+      "input": "MCP23017 GPA0",
+      "note": "active-low после оптопары"
+    },
+    {
+      "name": "chargeWarning",
+      "source": "12V лампа заряда",
+      "input": "MCP23017 GPA1",
+      "note": "active-low"
+    },
+    {
+      "name": "highBeam",
+      "source": "12V дальний свет",
+      "input": "MCP23017 GPA2",
+      "note": "active-low"
+    },
+    {
+      "name": "lowBeam",
+      "source": "12V ближний свет",
+      "input": "MCP23017 GPA3",
+      "note": "active-low"
+    },
+    {
+      "name": "turnLeft",
+      "source": "12V поворотник L",
+      "input": "MCP23017 GPA4",
+      "note": "active-low"
+    },
+    {
+      "name": "turnRight",
+      "source": "12V поворотник R",
+      "input": "MCP23017 GPA5",
+      "note": "active-low"
+    },
+    {
+      "name": "glowPlug",
+      "source": "12V свечи накала",
+      "input": "MCP23017 GPA6",
+      "note": "active-low"
+    },
+    {
+      "name": "ignition",
+      "source": "12V клемма 15 (зажигание)",
+      "input": "MCP23017 GPA7",
+      "note": "active-low"
+    },
+    {
+      "name": "oilHigh",
+      "source": "12V 1.8 бар (1.6 TD)",
+      "input": "MCP23017 GPB1",
+      "note": "опционально"
+    },
+    {
+      "name": "parkingBrake",
+      "source": "концевик ручника (замыкает на массу)",
+      "input": "MCP23017 GPB0",
+      "note": "отдельный вход; в UI — иконка (P)"
+    },
+    {
+      "name": "brakeFault",
+      "source": "датчик уровня жидкости / дифференциальный датчик давления",
+      "input": "MCP23017 GPB2",
+      "note": "отдельный вход; в UI — иконка brake failure"
+    }
   ],
   "notes": [
     "I2C на GPIO8/9 общая с GT911 и CH422G: используйте только свободные адреса.",
-    "GT911: 0x5D/0x14, CH422G: 0x20 (по конфигу платы). ADS1115: 0x48, MCP23017: 0x21.",
+    "GT911: 0x5D/0x14, CH422G: 0x24 (по конфигу платы). ADS1115: 0x48, MCP23017: 0x21.",
     "Все I2C-модули питать только от 3.3V. На плате уже есть pull-up 4.7k; лишние pull-up на модулях лучше снять.",
     "12V-входы заводить только через оптопары/делители. Общий провод платы и автомобиля — по схеме питания.",
     "GPIO6: 0..3.1V ADC. Используется как вход импульсов скорости с ABS (PCNT), не для RPM.",
@@ -209,6 +661,12 @@
     "Штатная лампа BRAKE остаётся рабочей: ESP32 только слушает те же провода через оптопары, ничего не разрывая.",
     "Кривые температуры/топлива проверить по дизельным датчикам; они могут отличаться от waterboxer.",
     "Записи signal:* и car:GND — именованные внешние цепи автомобиля, а не детали на плате.",
-    "Диаграмма: wiring.svg / wiring.png; подробный netlist: wiring.json."
+    "Диаграмма: wiring.svg / wiring.png; подробный netlist: wiring.json.",
+    "CH422G на этой плате имеет адрес 0x24 (не 0x20): конфликта с ADS1115 0x48 и MCP23017 0x21 нет.",
+    "Перемычка I2C level на Waveshare должна стоять в 3.3 В.",
+    "Opto input: oil/charge/glow — low-side (замыкание на массу); beams/turn/ignition — high-side (+12 В).",
+    "LM1815 питать от 3.3 В: выход 3.3 В безопасен для GPIO6. При square-wave от ABS ECU LM1815 не ставить.",
+    "Полной гальванической изоляции нет, если преобразователь 12→5 В не изолирован; оптроны защищают входы и разрывают сигнальные цепи.",
+    "Принципиальная схема: schematic.svg / schematic.png; генератор — scripts/draw_schematic.py."
   ]
 }
