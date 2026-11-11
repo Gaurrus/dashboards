@@ -23,6 +23,44 @@ constexpr uint32_t COL_BLUE = 0x3B82F6;
 constexpr uint32_t COL_TICK = 0x9CA3AF;
 constexpr uint32_t COL_TURN = 0x2ECC71;
 
+inline uint32_t lerpColor(uint32_t from, uint32_t to, float t) {
+  if (t < 0.0f) {
+    t = 0.0f;
+  }
+  if (t > 1.0f) {
+    t = 1.0f;
+  }
+  const int r1 = (from >> 16) & 0xFF;
+  const int g1 = (from >> 8) & 0xFF;
+  const int b1 = from & 0xFF;
+  const int r2 = (to >> 16) & 0xFF;
+  const int g2 = (to >> 8) & 0xFF;
+  const int b2 = to & 0xFF;
+  const int r = r1 + (int)((r2 - r1) * t);
+  const int g = g1 + (int)((g2 - g1) * t);
+  const int b = b1 + (int)((b2 - b1) * t);
+  return (uint32_t)((r << 16) | (g << 8) | b);
+}
+
+inline uint32_t rpmColor(float value) {
+  if (value <= 2500.0f) {
+    return COL_DARK_GREEN;
+  }
+  if (value >= 4500.0f) {
+    return COL_RED;
+  }
+  if (value < 3000.0f) {
+    return lerpColor(COL_DARK_GREEN, COL_GREEN, (value - 2500.0f) / 500.0f);
+  }
+  if (value < 3500.0f) {
+    return lerpColor(COL_GREEN, COL_YELLOW, (value - 3000.0f) / 500.0f);
+  }
+  if (value < 4000.0f) {
+    return lerpColor(COL_YELLOW, COL_ORANGE, (value - 3500.0f) / 500.0f);
+  }
+  return lerpColor(COL_ORANGE, COL_RED, (value - 4000.0f) / 500.0f);
+}
+
 inline lv_obj_t* makeLabel(lv_obj_t* parent, const char* text, const lv_font_t* font,
                            uint32_t color) {
   lv_obj_t* label = lv_label_create(parent);
