@@ -15,6 +15,7 @@ extern const lv_img_dsc_t icon_brake;
 extern const lv_img_dsc_t icon_brake_fault;
 extern const lv_img_dsc_t icon_arrow_left;
 extern const lv_img_dsc_t icon_arrow_right;
+extern const lv_img_dsc_t icon_settings;
 
 #ifdef __cplusplus
 }

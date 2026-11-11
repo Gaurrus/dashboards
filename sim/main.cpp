@@ -275,6 +275,10 @@ int main(int argc, char** argv) {
   const bool dialMenuShot = argc >= 3 && SDL_strcmp(argv[2], "dialmenu") == 0;
   const bool dialPickShot = argc >= 3 && SDL_strcmp(argv[2], "dialpick") == 0;
   const bool dialShot = dialMenuShot || dialPickShot;
+  const bool design2ColorShot =
+      argc >= 3 && SDL_strcmp(argv[2], "design2color") == 0;
+  const bool design2Shot =
+      design2ColorShot || (argc >= 3 && SDL_strcmp(argv[2], "design2") == 0);
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -383,6 +387,63 @@ int main(int argc, char** argv) {
       }
     }
   }
+  if (design2Shot) {
+    ui::update(demo::make(0.6f));
+    lv_tick_inc(40);
+    lv_timer_handler();
+    // Tap the gear button in the bottom-left corner.
+    gMouseX = 44;
+    gMouseY = 436;
+    gMouseDown = true;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    // Align the blink phase so the hazard arrows are visible in the shot.
+    if (((lv_tick_get() / 350U) & 1U) != 0U) {
+      lv_tick_inc(350);
+      lv_timer_handler();
+    }
+    ui::update(demo::make(0.6f));
+    lv_tick_inc(40);
+    lv_timer_handler();
+  }
+  if (design2ColorShot) {
+    // Hold the speed area for 3 s to open ARC COLOR.
+    gMouseX = 200;
+    gMouseY = 180;
+    gMouseDown = true;
+    for (int i = 0; i < 40; ++i) {
+      lv_tick_inc(90);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 6; ++i) {
+      lv_tick_inc(60);
+      lv_timer_handler();
+    }
+    // Pick green (row 0, column 1).
+    gMouseX = 358;
+    gMouseY = 209;
+    gMouseDown = true;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(60);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 6; ++i) {
+      lv_tick_inc(60);
+      lv_timer_handler();
+    }
+    ui::update(demo::make(2.0f));
+    lv_tick_inc(40);
+    lv_timer_handler();
+  }
   if (perfShot) {
     ui::skipBoot();
     float pt = 0.0f;
@@ -485,7 +546,10 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  float t = lowShot ? 6.0f : (brakeShot ? 4.0f : (brakeFaultShot ? 24.0f : 0.0f));
+  float t = lowShot ? 6.0f
+                    : (brakeShot ? 4.0f
+                                 : (brakeFaultShot ? 24.0f
+                                                   : (design2Shot ? 2.0f : 0.0f)));
   uint32_t lastTick = SDL_GetTicks();
 
   for (int frame = 0; frame < 4; ++frame) {

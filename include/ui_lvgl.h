@@ -23,4 +23,13 @@ void setClock(int hour, int minute, int second = 0);
 uint32_t clockSeconds();
 bool consumeClockChanged();
 
+namespace internal {
+
+// Shared speed accent color used by the classic gauge and the compact layout.
+// The ARC COLOR menu is owned by the classic layout.
+uint32_t speedColor();
+void showSpeedColorMenu();
+
+}  // namespace internal
+
 }  // namespace ui

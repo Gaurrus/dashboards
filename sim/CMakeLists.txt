@@ -28,12 +28,14 @@ add_custom_target(t3dash_version_header DEPENDS ${VERSION_HEADER})
 add_executable(t3dash_sim
   main.cpp
   ../src/ui/lvgl/ui_lvgl.cpp
+  ../src/ui/lvgl/ui_design_b.cpp
   ../src/ui/lvgl/ui_clock.cpp
   ../src/ui/lvgl/ui_brightness.cpp
   ../src/ui/lvgl/ui_bye.cpp
   ../assets/vw_gif.c
   ../assets/bye_gif.c
   ../assets/icons.c
+  ../assets/font_speed_160.c
 )
 
 target_include_directories(t3dash_sim PRIVATE

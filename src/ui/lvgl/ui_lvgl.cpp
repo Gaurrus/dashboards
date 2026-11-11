@@ -15,6 +15,7 @@
 #include "ui_brightness.h"
 #include "ui_bye.h"
 #include "ui_clock.h"
+#include "ui_design_b.h"
 #include "ui_theme.h"
 #include "version.h"
 #include "vw_gif.h"
@@ -96,10 +97,14 @@ constexpr uint32_t BOOT_TOTAL_MS =
 
 lv_obj_t* g_splash = nullptr;
 lv_obj_t* g_splashGif = nullptr;
+lv_obj_t* g_designA = nullptr;
+lv_obj_t* g_gearBtn = nullptr;
 bool g_bootStarted = false;
 bool g_bootSkipped = false;
 uint32_t g_bootStartMs = 0;
 bool g_selfTestActive = false;
+bool g_designBActive = false;
+Values g_lastValues;
 
 lv_obj_t* addTick(lv_obj_t* parent, int cx, int cy, float angleDeg, int rInner,
                   int rOuter, int width, uint32_t color) {
@@ -134,44 +139,6 @@ lv_obj_t* addTick(lv_obj_t* parent, int cx, int cy, float angleDeg, int rInner,
   lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
   lv_obj_clear_flag(line, LV_OBJ_FLAG_CLICKABLE);
   return line;
-}
-
-uint32_t lerpColor(uint32_t from, uint32_t to, float t) {
-  if (t < 0.0f) {
-    t = 0.0f;
-  }
-  if (t > 1.0f) {
-    t = 1.0f;
-  }
-  const int r1 = (from >> 16) & 0xFF;
-  const int g1 = (from >> 8) & 0xFF;
-  const int b1 = from & 0xFF;
-  const int r2 = (to >> 16) & 0xFF;
-  const int g2 = (to >> 8) & 0xFF;
-  const int b2 = to & 0xFF;
-  const int r = r1 + (int)((r2 - r1) * t);
-  const int g = g1 + (int)((g2 - g1) * t);
-  const int b = b1 + (int)((b2 - b1) * t);
-  return (uint32_t)((r << 16) | (g << 8) | b);
-}
-
-uint32_t rpmColor(float value) {
-  if (value <= 2500.0f) {
-    return COL_DARK_GREEN;
-  }
-  if (value >= 4500.0f) {
-    return COL_RED;
-  }
-  if (value < 3000.0f) {
-    return lerpColor(COL_DARK_GREEN, COL_GREEN, (value - 2500.0f) / 500.0f);
-  }
-  if (value < 3500.0f) {
-    return lerpColor(COL_GREEN, COL_YELLOW, (value - 3000.0f) / 500.0f);
-  }
-  if (value < 4000.0f) {
-    return lerpColor(COL_YELLOW, COL_ORANGE, (value - 3500.0f) / 500.0f);
-  }
-  return lerpColor(COL_ORANGE, COL_RED, (value - 4000.0f) / 500.0f);
 }
 
 // A full-size gradient ring is pre-rendered into a canvas once. Updating the
@@ -864,6 +831,34 @@ void applyValues(const Values& v) {
   ui::internal::clockUpdate();
 }
 
+void setGearVisible(bool visible) {
+  if (g_gearBtn == nullptr) {
+    return;
+  }
+  const bool hidden = lv_obj_has_flag(g_gearBtn, LV_OBJ_FLAG_HIDDEN);
+  if (visible && hidden) {
+    lv_obj_clear_flag(g_gearBtn, LV_OBJ_FLAG_HIDDEN);
+  } else if (!visible && !hidden) {
+    lv_obj_add_flag(g_gearBtn, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+void gearCb(lv_event_t* /*e*/) {
+  if (ui::internal::byeActive()) {
+    return;
+  }
+  g_designBActive = !g_designBActive;
+  if (g_designBActive) {
+    lv_obj_add_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    ui::internal::designBSetVisible(true);
+    ui::internal::designBUpdate(g_lastValues);
+  } else {
+    ui::internal::designBSetVisible(false);
+    lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    applyValues(g_lastValues);
+  }
+}
+
 }  // namespace
 
 namespace ui {
@@ -877,44 +872,54 @@ void init() {
   lv_obj_set_style_bg_color(screen, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
 
+  // A transparent full-screen container holds the classic layout so the gear
+  // button can switch between designs by hiding it as a whole.
+  g_designA = lv_obj_create(screen);
+  lv_obj_remove_style_all(g_designA);
+  lv_obj_set_pos(g_designA, 0, 0);
+  lv_obj_set_size(g_designA, 800, 480);
+  lv_obj_set_style_bg_opa(g_designA, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_CLICKABLE);
+
   // Status icons follow an arc concentric with the speedometer.
-  g_iconOil = createOrbitIcon(screen, &icon_oil, 0);
-  g_iconChg = createOrbitIcon(screen, &icon_charge, 1);
-  g_iconBrake = createOrbitIcon(screen, &icon_brake, 2);
-  g_iconBrakeFault = createOrbitIcon(screen, &icon_brake_fault, 2);
+  g_iconOil = createOrbitIcon(g_designA, &icon_oil, 0);
+  g_iconChg = createOrbitIcon(g_designA, &icon_charge, 1);
+  g_iconBrake = createOrbitIcon(g_designA, &icon_brake, 2);
+  g_iconBrakeFault = createOrbitIcon(g_designA, &icon_brake_fault, 2);
   lv_obj_set_style_img_opa(g_iconBrakeFault, LV_OPA_0, 0);
-  g_iconGlow = createOrbitIcon(screen, &icon_glow, 3);
-  g_iconFog = createOrbitIcon(screen, &icon_anti_fog, 4);
-  g_iconLowBeam = createOrbitIcon(screen, &icon_beam_low, 5);
-  g_iconBeam = createOrbitIcon(screen, &icon_beam_high, 5);
+  g_iconGlow = createOrbitIcon(g_designA, &icon_glow, 3);
+  g_iconFog = createOrbitIcon(g_designA, &icon_anti_fog, 4);
+  g_iconLowBeam = createOrbitIcon(g_designA, &icon_beam_low, 5);
+  g_iconBeam = createOrbitIcon(g_designA, &icon_beam_high, 5);
 
   // Classic VW turn signal arrows: left on the left edge, right on the right edge.
-  g_turnLeft = createTurnArrow(screen, &icon_arrow_left, 20, 8);
-  g_turnRight = createTurnArrow(screen, &icon_arrow_right, 726, 8);
+  g_turnLeft = createTurnArrow(g_designA, &icon_arrow_left, 20, 8);
+  g_turnRight = createTurnArrow(g_designA, &icon_arrow_right, 726, 8);
 
   // Left: clock. Center: large speedometer. Right: tachometer.
-  ui::internal::clockInit(screen);
+  ui::internal::clockInit(g_designA);
 
-  g_speed = createGauge(screen, 242, 75, SPEED_SIZE, "", "km/h", 180, COL_CYAN,
+  g_speed = createGauge(g_designA, 242, 75, SPEED_SIZE, "", "km/h", 180, COL_CYAN,
                         -1.0f, 10.0f, 20.0f, false, 22, &lv_font_montserrat_48,
                         &lv_font_montserrat_24, &lv_font_montserrat_20);
 
-  g_rpm = createGauge(screen, 576, 125, SIDE_SIZE, "", "RPM x1000", 5500, COL_ORANGE,
+  g_rpm = createGauge(g_designA, 576, 125, SIDE_SIZE, "", "RPM x1000", 5500, COL_ORANGE,
                       4500.0f / 5500.0f, 500.0f, 1000.0f, true, 14,
                       &lv_font_montserrat_32, &lv_font_montserrat_12,
                       &lv_font_montserrat_12, true, 2500.0f, 4500.0f, COL_DARK_GREEN,
                       COL_RED, 100.0f, rpmColor);
 
-  g_voltage = makeLabel(screen, "--.-V", &lv_font_montserrat_32, COL_GREEN);
+  g_voltage = makeLabel(g_designA, "--.-V", &lv_font_montserrat_32, COL_GREEN);
   lv_obj_align(g_voltage, LV_ALIGN_CENTER, 0, 168);
 
-  g_odo = makeLabel(screen, "0.0 km", &lv_font_montserrat_20, COL_DIM);
+  g_odo = makeLabel(g_designA, "0.0 km", &lv_font_montserrat_20, COL_DIM);
   lv_obj_align(g_odo, LV_ALIGN_CENTER, 0, 202);
 
-  g_tempLabel = makeLabel(screen, "TEMP --", &lv_font_montserrat_20, COL_TEXT);
+  g_tempLabel = makeLabel(g_designA, "TEMP --", &lv_font_montserrat_20, COL_TEXT);
   lv_obj_set_pos(g_tempLabel, 14, 348);
 
-  g_tempGradient = lv_obj_create(screen);
+  g_tempGradient = lv_obj_create(g_designA);
   lv_obj_remove_style_all(g_tempGradient);
   lv_obj_set_pos(g_tempGradient, 14, 376);
   lv_obj_set_size(g_tempGradient, 210, 16);
@@ -941,7 +946,7 @@ void init() {
   lv_obj_clear_flag(g_tempCover, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(g_tempCover, LV_OBJ_FLAG_CLICKABLE);
 
-  g_tempOutline = lv_obj_create(screen);
+  g_tempOutline = lv_obj_create(g_designA);
   lv_obj_remove_style_all(g_tempOutline);
   lv_obj_set_pos(g_tempOutline, 14, 376);
   lv_obj_set_size(g_tempOutline, 210, 16);
@@ -952,10 +957,10 @@ void init() {
   lv_obj_clear_flag(g_tempOutline, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(g_tempOutline, LV_OBJ_FLAG_CLICKABLE);
 
-  g_fuelLabel = makeLabel(screen, "FUEL --", &lv_font_montserrat_20, COL_TEXT);
+  g_fuelLabel = makeLabel(g_designA, "FUEL --", &lv_font_montserrat_20, COL_TEXT);
   lv_obj_set_pos(g_fuelLabel, 576, 348);
 
-  g_fuelGradient = lv_obj_create(screen);
+  g_fuelGradient = lv_obj_create(g_designA);
   lv_obj_remove_style_all(g_fuelGradient);
   lv_obj_set_pos(g_fuelGradient, 576, 376);
   lv_obj_set_size(g_fuelGradient, 210, 16);
@@ -982,7 +987,7 @@ void init() {
   lv_obj_clear_flag(g_fuelCover, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(g_fuelCover, LV_OBJ_FLAG_CLICKABLE);
 
-  g_fuelOutline = lv_obj_create(screen);
+  g_fuelOutline = lv_obj_create(g_designA);
   lv_obj_remove_style_all(g_fuelOutline);
   lv_obj_set_pos(g_fuelOutline, 576, 376);
   lv_obj_set_size(g_fuelOutline, 210, 16);
@@ -993,12 +998,35 @@ void init() {
   lv_obj_clear_flag(g_fuelOutline, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(g_fuelOutline, LV_OBJ_FLAG_CLICKABLE);
 
+  ui::internal::designBInit(screen);
+
   g_splash = createSplash(screen);
   ui::internal::byeInit(screen);
 
+  // Gear button: switches between the classic and the compact layout. It lives
+  // on the top layer, but is created before the brightness dimmer and the
+  // settings overlays so they can cover it.
+  g_gearBtn = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(g_gearBtn);
+  lv_obj_set_size(g_gearBtn, 56, 56);
+  lv_obj_set_pos(g_gearBtn, 16, 408);
+  lv_obj_set_style_radius(g_gearBtn, 12, 0);
+  lv_obj_set_style_bg_opa(g_gearBtn, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_bg_color(g_gearBtn, lv_color_hex(COL_TRACK), LV_STATE_PRESSED);
+  lv_obj_set_style_bg_opa(g_gearBtn, (lv_opa_t)140, LV_STATE_PRESSED);
+  lv_obj_add_flag(g_gearBtn, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(g_gearBtn, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(g_gearBtn, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_event_cb(g_gearBtn, gearCb, LV_EVENT_CLICKED, nullptr);
+
+  lv_obj_t* gearIcon = lv_img_create(g_gearBtn);
+  lv_img_set_src(gearIcon, &icon_settings);
+  lv_obj_center(gearIcon);
+  lv_obj_clear_flag(gearIcon, LV_OBJ_FLAG_CLICKABLE);
+
   ui::internal::brightnessInit();
 
-  lv_obj_t* clockHit = lv_obj_create(lv_layer_top());
+  lv_obj_t* clockHit = lv_obj_create(g_designA);
   lv_obj_remove_style_all(clockHit);
   lv_obj_set_size(clockHit, ui::internal::CLOCK_SIZE, ui::internal::CLOCK_SIZE);
   lv_obj_set_pos(clockHit, ui::internal::CLOCK_X, ui::internal::CLOCK_Y);
@@ -1007,7 +1035,7 @@ void init() {
   lv_obj_clear_flag(clockHit, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_event_cb(clockHit, clockTapCb, LV_EVENT_CLICKED, nullptr);
 
-  lv_obj_t* dialHit = lv_obj_create(lv_layer_top());
+  lv_obj_t* dialHit = lv_obj_create(g_designA);
   lv_obj_remove_style_all(dialHit);
   lv_obj_set_size(dialHit, SPEED_SIZE, SPEED_SIZE);
   lv_obj_set_pos(dialHit, 242, 75);
@@ -1024,6 +1052,7 @@ void update(const Values& v) {
   if (ui::internal::byeUpdate(v.ignitionOn)) {
     ui::internal::clockHideSettings();
     colorMenuHide();
+    setGearVisible(false);
     return;
   }
 
@@ -1037,6 +1066,7 @@ void update(const Values& v) {
 
   if (elapsed < BOOT_SPLASH_MS) {
     ui::internal::clockUpdate();
+    setGearVisible(false);
     return;
   }
 
@@ -1084,16 +1114,40 @@ void update(const Values& v) {
     selfTest.turnRight = true;
 
     g_selfTestActive = true;
+    setGearVisible(false);
     applyValues(selfTest);
     return;
   }
 
   g_selfTestActive = false;
-  applyValues(v);
+  setGearVisible(true);
+  g_lastValues = v;
+  if (g_designBActive) {
+    ui::internal::designBUpdate(v);
+  } else {
+    applyValues(v);
+  }
 }
 
 void skipBoot() {
   g_bootSkipped = true;
 }
 
+}  // namespace ui
+
+namespace ui {
+namespace internal {
+
+uint32_t speedColor() {
+  return g_speedArcColor;
+}
+
+void showSpeedColorMenu() {
+  if (ui::internal::byeActive()) {
+    return;
+  }
+  colorMenuShow();
+}
+
+}  // namespace internal
 }  // namespace ui

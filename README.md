@@ -7,20 +7,29 @@
 UI — **LVGL 8.4.0**. В репозитории есть PC-симулятор 800×480 на SDL2,
 прошивка Waveshare и скетч для Arduino IDE.
 
-Текущая версия: **1.0.1** (`VERSION`).
+Текущая версия: **1.1.0** (`VERSION`).
 
 ## Возможности
 
 - Boot-заставка VW, self-test ламп и шкал, переход к приборке.
 - Аналоговые часы + цифровое время; настройка времени тапом, 00:00–23:59.
 - Спидометр 0–180 км/ч, тахометр 0–5500 об/мин с красной зоной.
+- Два дизайна приборки: классический (часы, круглые шкалы) и компактный
+  (крупная курсивная голубая скорость с градиентом вниз по центру левой половины, под ней
+  цифровые часы и пробег; справа — вложенные четверть-круговые шкалы
+  тахометра, температуры и топлива во 2-й четверти с центром в правом нижнем
+  углу (числа тахометра 0–5 ×1000, риски на температуре и топливе; заливка
+  сегментами 10 px (зазор 4 px): активные — цвет по всей высоте с затуханием на всю высоту внутрь,
+  неактивные — серые полупрозрачные); блок увеличен в 2 раза, лампы
+  сдвинуты влево).
+  Переключение — кнопка-шестерёнка в левом нижнем углу.
 - TEMP/FUEL с градиентными шкалами и предупреждениями.
 - Вольтметр, одометр, индикаторы: масло, заряд, свечи, ближний/дальний,
   поворотники, ручник, неисправность тормозов, ПТФ.
 - Свайп по правому краю — программная яркость (подсветка Waveshare только вкл/выкл).
 - Бай-бай экран при выключении зажигания.
 - Удержание в центре спидометра — выбор цвета дуги (`ARC COLOR`).
-- Версия прошивки мелким шрифтом на экране приветствия (`v1.0.1`).
+- Версия прошивки мелким шрифтом на экране приветствия (`v1.1.0`).
 - Демо-режим на Waveshare; реальные датчики подключаются по схеме ниже.
 
 ## Железо
@@ -64,7 +73,8 @@ include/                 общие типы, конфиг, demo-данные, v
 src/
   hal/                   hal.h, hal_sim.cpp, hal_real.cpp
   logic/                 model.cpp, calibration.cpp
-  ui/lvgl/               UI-модули LVGL: ui_lvgl, ui_clock, ui_brightness, ui_bye
+  ui/lvgl/               UI-модули LVGL: ui_lvgl, ui_design_b, ui_clock,
+                         ui_brightness, ui_bye
   ui/dashboard.cpp       старый TFT-UI (legacy)
 assets/                  иконки, GIF, C-массивы
 sim/                     PC-симулятор LVGL + SDL2
@@ -96,6 +106,8 @@ cd sim
 ./build/t3dash_sim /tmp/bye.bmp bye       # бай-бай экран
 ./build/t3dash_sim /tmp/clock.bmp clock   # время 10:08
 ./build/t3dash_sim /tmp/dial.bmp dialpick # меню ARC COLOR
+./build/t3dash_sim /tmp/design2.bmp design2 # второй дизайн
+./build/t3dash_sim /tmp/design2color.bmp design2color # смена цвета скорости
 ```
 
 Конвертация BMP → PNG:
@@ -168,13 +180,13 @@ PlatformIO Waveshare делает это автоматически (`extra_scri
 - Версия печатается в Serial при старте и доступна в `t3dash_sim --version`.
 - Каждая версия — отдельная папка `dist/vX.Y.Z/`; версия также остаётся
   в именах файлов:
-  `dist/v1.0.1/t3-dash-waveshare-7-16MB-v1.0.1.bin`,
-  `dist/v1.0.1/t3-dash-arduino-sketch-v1.0.1.zip`.
+  `dist/v1.1.0/t3-dash-waveshare-7-16MB-v1.1.0.bin`,
+  `dist/v1.1.0/t3-dash-arduino-sketch-v1.1.0.zip`.
 - Манифест релиза:
 
 ```bash
 python3 scripts/make_dist_manifest.py
-# dist/v1.0.1/t3-dash-v1.0.1.json
+# dist/v1.1.0/t3-dash-v1.1.0.json
 ```
 
 - Релизный коммит помечается тегом `vMAJOR.MINOR.PATCH`.
@@ -211,4 +223,9 @@ cd waveshare && ~/.platformio-venv/bin/pio run -e BOARD_WAVESHARE_ESP32_S3_TOUCH
 - `assets/bye.gif` — чертёж T3/T25 для бай-бай экрана.
 - `assets/icons_svg/` — исходники иконок (OEM/ISO 2575, Openclipart,
   Wikimedia Commons; лицензии в `_manifest.json`/исходниках).
+- `assets/icons_svg/settings.svg` — иконка переключения дизайна
+  (пользовательский ассет; перекрашена под тёмную тему).
+- `assets/font_speed_160.c` — Montserrat Bold Italic 160 px (цифры и `-`),
+  сгенерирован через `lv_font_conv`; лицензия SIL OFL 1.1 —
+  `assets/Montserrat-OFL.txt`.
 - Логотип VW — товарный знак Volkswagen. Проект личный/некоммерческий.
