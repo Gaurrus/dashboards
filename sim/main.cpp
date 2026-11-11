@@ -277,8 +277,15 @@ int main(int argc, char** argv) {
   const bool dialShot = dialMenuShot || dialPickShot;
   const bool design2ColorShot =
       argc >= 3 && SDL_strcmp(argv[2], "design2color") == 0;
+  const bool designListShot =
+      argc >= 3 && SDL_strcmp(argv[2], "designlist") == 0;
+  const bool design3ColorShot =
+      argc >= 3 && SDL_strcmp(argv[2], "design3color") == 0;
+  const bool design3Shot =
+      design3ColorShot || (argc >= 3 && SDL_strcmp(argv[2], "design3") == 0);
   const bool design2Shot =
-      design2ColorShot || (argc >= 3 && SDL_strcmp(argv[2], "design2") == 0);
+      design2ColorShot || design3Shot ||
+      (argc >= 3 && SDL_strcmp(argv[2], "design2") == 0);
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
@@ -404,6 +411,19 @@ int main(int argc, char** argv) {
       lv_tick_inc(40);
       lv_timer_handler();
     }
+    // Pick COMPACT / SEGMENTED from the design list.
+    gMouseX = 400;
+    gMouseY = design3Shot ? 246 : 302;
+    gMouseDown = true;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
     // Align the blink phase so the hazard arrows are visible in the shot.
     if (((lv_tick_get() / 350U) & 1U) != 0U) {
       lv_tick_inc(350);
@@ -413,10 +433,30 @@ int main(int argc, char** argv) {
     lv_tick_inc(40);
     lv_timer_handler();
   }
-  if (design2ColorShot) {
+  if (designListShot) {
+    ui::update(demo::make(0.0f));
+    lv_tick_inc(40);
+    lv_timer_handler();
+    gMouseX = 44;
+    gMouseY = 436;
+    gMouseDown = true;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    ui::update(demo::make(0.0f));
+    lv_tick_inc(40);
+    lv_timer_handler();
+  }
+  if (design2ColorShot || design3ColorShot) {
     // Hold the speed area for 3 s to open ARC COLOR.
-    gMouseX = 200;
-    gMouseY = 180;
+    gMouseX = design3ColorShot ? 400 : 200;
+    gMouseY = design3ColorShot ? 233 : 180;
     gMouseDown = true;
     for (int i = 0; i < 40; ++i) {
       lv_tick_inc(90);

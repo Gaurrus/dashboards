@@ -7,7 +7,7 @@
 UI — **LVGL 8.4.0**. В репозитории есть PC-симулятор 800×480 на SDL2,
 прошивка Waveshare и скетч для Arduino IDE.
 
-Текущая версия: **1.1.0** (`VERSION`).
+Текущая версия: **1.2.0** (`VERSION`).
 
 ## Возможности
 
@@ -29,7 +29,7 @@ UI — **LVGL 8.4.0**. В репозитории есть PC-симулятор 
 - Свайп по правому краю — программная яркость (подсветка Waveshare только вкл/выкл).
 - Бай-бай экран при выключении зажигания.
 - Удержание в центре спидометра — выбор цвета дуги (`ARC COLOR`).
-- Версия прошивки мелким шрифтом на экране приветствия (`v1.1.0`).
+- Версия прошивки мелким шрифтом на экране приветствия (`v1.2.0`).
 - Демо-режим на Waveshare; реальные датчики подключаются по схеме ниже.
 
 ## Железо
@@ -106,8 +106,11 @@ cd sim
 ./build/t3dash_sim /tmp/bye.bmp bye       # бай-бай экран
 ./build/t3dash_sim /tmp/clock.bmp clock   # время 10:08
 ./build/t3dash_sim /tmp/dial.bmp dialpick # меню ARC COLOR
+./build/t3dash_sim /tmp/designlist.bmp designlist # список дизайнов
 ./build/t3dash_sim /tmp/design2.bmp design2 # второй дизайн
 ./build/t3dash_sim /tmp/design2color.bmp design2color # смена цвета скорости
+./build/t3dash_sim /tmp/design3.bmp design3 # CLASSIC+ (сегментная классика)
+./build/t3dash_sim /tmp/design3color.bmp design3color # смена цвета в CLASSIC+
 ```
 
 Конвертация BMP → PNG:
@@ -180,13 +183,13 @@ PlatformIO Waveshare делает это автоматически (`extra_scri
 - Версия печатается в Serial при старте и доступна в `t3dash_sim --version`.
 - Каждая версия — отдельная папка `dist/vX.Y.Z/`; версия также остаётся
   в именах файлов:
-  `dist/v1.1.0/t3-dash-waveshare-7-16MB-v1.1.0.bin`,
-  `dist/v1.1.0/t3-dash-arduino-sketch-v1.1.0.zip`.
+  `dist/v1.2.0/t3-dash-waveshare-7-16MB-v1.2.0.bin`,
+  `dist/v1.2.0/t3-dash-arduino-sketch-v1.2.0.zip`.
 - Манифест релиза:
 
 ```bash
 python3 scripts/make_dist_manifest.py
-# dist/v1.1.0/t3-dash-v1.1.0.json
+# dist/v1.2.0/t3-dash-v1.2.0.json
 ```
 
 - Релизный коммит помечается тегом `vMAJOR.MINOR.PATCH`.
