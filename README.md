@@ -109,6 +109,7 @@ cd sim
 ./build/t3dash_sim /tmp/designlist.bmp designlist # список дизайнов
 ./build/t3dash_sim /tmp/design2.bmp design2 # второй дизайн
 ./build/t3dash_sim /tmp/design2color.bmp design2color # смена цвета скорости
+./build/t3dash_sim /tmp/design2clock.bmp design2clock # SET TIME из COMPACT
 ./build/t3dash_sim /tmp/design3.bmp design3 # CLASSIC+ (сегментная классика)
 ./build/t3dash_sim /tmp/design3color.bmp design3color # смена цвета в CLASSIC+
 ```

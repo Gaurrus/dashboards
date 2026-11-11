@@ -12,6 +12,8 @@
 
 #include "font_speed_160.h"
 #include "icons.h"
+#include "ui_bye.h"
+#include "ui_clock.h"
 #include "ui_lvgl.h"
 #include "ui_theme.h"
 
@@ -281,6 +283,13 @@ void rebuildSpeedDigits(uint32_t color) {
   for (int i = 0; i < 3; ++i) {
     lv_obj_invalidate(g_speedDigits[i]);
   }
+}
+
+void clockTapCb(lv_event_t* /*e*/) {
+  if (ui::internal::byeActive()) {
+    return;
+  }
+  ui::internal::clockShowSettings();
 }
 
 void speedHoldCb(lv_event_t* e) {
@@ -751,6 +760,8 @@ void designBInit(lv_obj_t* parent) {
 
   g_clockLabel = makeLabel(g_root, "--:--", &lv_font_montserrat_32, COL_TEXT);
   lv_obj_align_to(g_clockLabel, unit, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
+  lv_obj_add_flag(g_clockLabel, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(g_clockLabel, clockTapCb, LV_EVENT_CLICKED, nullptr);
 
   g_odoLabel = makeLabel(g_root, "0.0 km", &lv_font_montserrat_20, COL_DIM);
   lv_obj_align_to(g_odoLabel, g_clockLabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 8);

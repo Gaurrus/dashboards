@@ -277,6 +277,8 @@ int main(int argc, char** argv) {
   const bool dialShot = dialMenuShot || dialPickShot;
   const bool design2ColorShot =
       argc >= 3 && SDL_strcmp(argv[2], "design2color") == 0;
+  const bool design2ClockShot =
+      argc >= 3 && SDL_strcmp(argv[2], "design2clock") == 0;
   const bool designListShot =
       argc >= 3 && SDL_strcmp(argv[2], "designlist") == 0;
   const bool design3ColorShot =
@@ -284,7 +286,7 @@ int main(int argc, char** argv) {
   const bool design3Shot =
       design3ColorShot || (argc >= 3 && SDL_strcmp(argv[2], "design3") == 0);
   const bool design2Shot =
-      design2ColorShot || design3Shot ||
+      design2ColorShot || design2ClockShot || design3Shot ||
       (argc >= 3 && SDL_strcmp(argv[2], "design2") == 0);
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -450,6 +452,23 @@ int main(int argc, char** argv) {
       lv_timer_handler();
     }
     ui::update(demo::make(0.0f));
+    lv_tick_inc(40);
+    lv_timer_handler();
+  }
+  if (design2ClockShot) {
+    gMouseX = 200;
+    gMouseY = 302;
+    gMouseDown = true;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 6; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    ui::update(demo::make(2.0f));
     lv_tick_inc(40);
     lv_timer_handler();
   }
