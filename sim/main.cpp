@@ -285,8 +285,13 @@ int main(int argc, char** argv) {
       argc >= 3 && SDL_strcmp(argv[2], "design3color") == 0;
   const bool design3Shot =
       design3ColorShot || (argc >= 3 && SDL_strcmp(argv[2], "design3") == 0);
+  const bool design4ClockShot =
+      argc >= 3 && SDL_strcmp(argv[2], "design4clock") == 0;
+  const bool design4Shot =
+      design4ClockShot ||
+      (argc >= 3 && SDL_strcmp(argv[2], "design4") == 0);
   const bool design2Shot =
-      design2ColorShot || design2ClockShot || design3Shot ||
+      design2ColorShot || design2ClockShot || design3Shot || design4Shot ||
       (argc >= 3 && SDL_strcmp(argv[2], "design2") == 0);
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -415,7 +420,7 @@ int main(int argc, char** argv) {
     }
     // Pick COMPACT / SEGMENTED from the design list.
     gMouseX = 400;
-    gMouseY = design3Shot ? 246 : 302;
+    gMouseY = design3Shot ? 218 : (design4Shot ? 330 : 274);
     gMouseDown = true;
     for (int i = 0; i < 4; ++i) {
       lv_tick_inc(40);
@@ -458,6 +463,24 @@ int main(int argc, char** argv) {
   if (design2ClockShot) {
     gMouseX = 200;
     gMouseY = 302;
+    gMouseDown = true;
+    for (int i = 0; i < 4; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    gMouseDown = false;
+    for (int i = 0; i < 6; ++i) {
+      lv_tick_inc(40);
+      lv_timer_handler();
+    }
+    ui::update(demo::make(2.0f));
+    lv_tick_inc(40);
+    lv_timer_handler();
+  }
+  if (design4ClockShot) {
+    // Tap the grey clock panel in the right well.
+    gMouseX = 653;
+    gMouseY = 275;
     gMouseDown = true;
     for (int i = 0; i < 4; ++i) {
       lv_tick_inc(40);
@@ -619,6 +642,15 @@ int main(int argc, char** argv) {
     lv_timer_handler();
     SDL_Delay(16);
     t += 0.016f;
+  }
+
+  if (design4Shot) {
+    if (((lv_tick_get() / 350U) & 1U) != 0U) {
+      lv_tick_inc(350);
+      lv_timer_handler();
+    }
+    ui::update(demo::make(t));
+    lv_timer_handler();
   }
 
   if (screenshot) {

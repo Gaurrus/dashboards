@@ -11,8 +11,8 @@ DST="$ROOT/arduino/t3-dash"
 
 python3 "$ROOT/scripts/gen_version.py"
 
-UI_CPP=(ui_lvgl.cpp ui_design_b.cpp ui_clock.cpp ui_brightness.cpp ui_bye.cpp)
-UI_H=(ui_theme.h ui_design_b.h ui_clock.h ui_brightness.h ui_bye.h)
+UI_CPP=(ui_lvgl.cpp ui_design_b.cpp ui_design_d.cpp ui_clock.cpp ui_brightness.cpp ui_bye.cpp)
+UI_H=(ui_theme.h ui_design_b.h ui_design_d.h ui_clock.h ui_brightness.h ui_bye.h)
 INC_H=(ui_lvgl.h dash_types.h demo_values.h version.h)
 ASSET_FILES=(icons.c icons.h font_speed_160.c font_speed_160.h vw_gif.c vw_gif.h bye_gif.c bye_gif.h)
 

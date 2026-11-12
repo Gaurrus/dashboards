@@ -16,6 +16,7 @@
 #include "ui_bye.h"
 #include "ui_clock.h"
 #include "ui_design_b.h"
+#include "ui_design_d.h"
 #include "ui_theme.h"
 #include "version.h"
 #include "vw_gif.h"
@@ -105,7 +106,7 @@ bool g_bootStarted = false;
 bool g_bootSkipped = false;
 uint32_t g_bootStartMs = 0;
 bool g_selfTestActive = false;
-constexpr int kDesignCount = 3;
+constexpr int kDesignCount = 4;
 int g_currentDesign = 0;
 lv_obj_t* g_designMenu = nullptr;
 lv_obj_t* g_designRows[kDesignCount] = {};
@@ -1295,19 +1296,27 @@ void applyDesign(int index) {
   g_currentDesign = index;
   if (index == 0) {
     ui::internal::designBSetVisible(false);
+    ui::internal::designDSetVisible(false);
     lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
     setClassicSegmented(false);
     applyValues(g_lastValues);
   } else if (index == 1) {
     ui::internal::designBSetVisible(false);
+    ui::internal::designDSetVisible(false);
     lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
     setClassicSegmented(true);
     applyValues(g_lastValues);
     applySegmentedValues(g_lastValues);
-  } else {
+  } else if (index == 2) {
     lv_obj_add_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    ui::internal::designDSetVisible(false);
     ui::internal::designBSetVisible(true);
     ui::internal::designBUpdate(g_lastValues);
+  } else {
+    lv_obj_add_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    ui::internal::designBSetVisible(false);
+    ui::internal::designDSetVisible(true);
+    ui::internal::designDUpdate(g_lastValues);
   }
   designMenuUpdateSelection();
 }
@@ -1336,7 +1345,7 @@ lv_obj_t* createDesignMenu() {
 
   lv_obj_t* panel = lv_obj_create(backdrop);
   lv_obj_remove_style_all(panel);
-  lv_obj_set_size(panel, 320, 256);
+  lv_obj_set_size(panel, 320, 312);
   lv_obj_center(panel);
   lv_obj_set_style_bg_color(panel, lv_color_hex(0x141A20), 0);
   lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
@@ -1349,7 +1358,7 @@ lv_obj_t* createDesignMenu() {
   lv_obj_t* title = makeLabel(panel, "DESIGN", &lv_font_montserrat_24, COL_TEXT);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 16);
 
-  const char* names[kDesignCount] = {"CLASSIC", "CLASSIC+", "COMPACT"};
+  const char* names[kDesignCount] = {"CLASSIC", "CLASSIC+", "COMPACT", "WELLS"};
   for (int i = 0; i < kDesignCount; ++i) {
     lv_obj_t* row = lv_obj_create(panel);
     lv_obj_remove_style_all(row);
@@ -1531,6 +1540,7 @@ void init() {
   lv_obj_clear_flag(g_fuelOutline, LV_OBJ_FLAG_CLICKABLE);
 
   ui::internal::designBInit(screen);
+  ui::internal::designDInit(screen);
 
   g_splash = createSplash(screen);
   ui::internal::byeInit(screen);
@@ -1658,6 +1668,8 @@ void update(const Values& v) {
   g_lastValues = v;
   if (g_currentDesign == 2) {
     ui::internal::designBUpdate(v);
+  } else if (g_currentDesign == 3) {
+    ui::internal::designDUpdate(v);
   } else {
     applyValues(v);
     if (g_currentDesign == 1) {
