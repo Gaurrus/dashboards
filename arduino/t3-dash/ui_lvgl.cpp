@@ -16,6 +16,7 @@
 #include "ui_bye.h"
 #include "ui_clock.h"
 #include "ui_design_b.h"
+#include "ui_design_d.h"
 #include "ui_theme.h"
 #include "version.h"
 #include "vw_gif.h"
@@ -40,6 +41,8 @@ struct Gauge {
   lv_obj_t* arc = nullptr;
   lv_obj_t* value = nullptr;
   lv_obj_t* cover = nullptr;
+  lv_obj_t* redline = nullptr;
+  lv_obj_t* ring = nullptr;
   uint32_t indicatorColor = 0xFFFFFFFFU;
   int32_t max = 0;
   bool div1000 = false;
@@ -103,7 +106,10 @@ bool g_bootStarted = false;
 bool g_bootSkipped = false;
 uint32_t g_bootStartMs = 0;
 bool g_selfTestActive = false;
-bool g_designBActive = false;
+constexpr int kDesignCount = 4;
+int g_currentDesign = 0;
+lv_obj_t* g_designMenu = nullptr;
+lv_obj_t* g_designRows[kDesignCount] = {};
 Values g_lastValues;
 
 lv_obj_t* addTick(lv_obj_t* parent, int cx, int cy, float angleDeg, int rInner,
@@ -227,6 +233,7 @@ Gauge createGauge(lv_obj_t* parent, int x, int y, int size, const char* title,
       lv_canvas_set_buffer(ring, ringBuf, size, size,
                            LV_IMG_CF_TRUE_COLOR_ALPHA);
       lv_obj_set_pos(ring, 0, 0);
+      g.ring = ring;
       lv_canvas_fill_bg(ring, lv_color_black(), LV_OPA_TRANSP);
 
       lv_draw_arc_dsc_t arcDsc;
@@ -755,6 +762,425 @@ lv_obj_t* createColorMenu() {
   return backdrop;
 }
 
+constexpr int SEG_W = 10;
+constexpr int SEG_GAP = 4;
+constexpr int SEG_RADIUS = 2;
+constexpr uint32_t SEG_GREY = 0x6B7280U;
+
+struct SegArc {
+  lv_obj_t* canvas = nullptr;
+  uint8_t* buffer = nullptr;
+  int size = 0;
+  int radius = 0;
+  int width = 0;
+  float startDeg = 0.0f;
+  float sweepDeg = 0.0f;
+  int segmentCount = 0;
+  float dashDeg = 0.0f;
+  float periodDeg = 0.0f;
+  float scaleMin = 0.0f;
+  float scaleMax = 0.0f;
+  uint32_t (*colorFn)(float) = nullptr;
+  int lit = 0;
+  uint32_t lastSample = 0;
+};
+
+struct SegBar {
+  lv_obj_t* root = nullptr;
+  lv_obj_t* segments[16] = {};
+  int count = 0;
+  float scaleMin = 0.0f;
+  float scaleMax = 0.0f;
+  uint32_t (*colorFn)(float) = nullptr;
+  int lit = 0;
+};
+
+lv_obj_t* g_segOverlay = nullptr;
+SegArc g_speedSeg;
+SegArc g_tachSeg;
+SegBar g_tempSeg;
+SegBar g_fuelSeg;
+bool g_classicSegmented = false;
+
+uint32_t speedSegColor(float /*value*/) {
+  return g_speedArcColor;
+}
+
+uint32_t tempBarColor(float value) {
+  if (value <= 80.0f) {
+    return lerpColor(COL_BLUE, COL_GREEN, (value - 40.0f) / 40.0f);
+  }
+  if (value <= 100.0f) {
+    return lerpColor(COL_GREEN, COL_ORANGE, (value - 80.0f) / 20.0f);
+  }
+  if (value < 115.0f) {
+    return lerpColor(COL_ORANGE, COL_RED, (value - 100.0f) / 15.0f);
+  }
+  return COL_RED;
+}
+
+uint32_t fuelBarColor(float value) {
+  if (value <= 10.0f) {
+    return COL_RED;
+  }
+  if (value <= 30.0f) {
+    return lerpColor(COL_RED, COL_ORANGE, (value - 10.0f) / 20.0f);
+  }
+  if (value <= 50.0f) {
+    return lerpColor(COL_ORANGE, COL_YELLOW, (value - 30.0f) / 20.0f);
+  }
+  return lerpColor(COL_YELLOW, COL_GREEN, (value - 50.0f) / 50.0f);
+}
+
+void segArcWritePixel(SegArc& g, int x, int y, uint32_t color, lv_opa_t opa) {
+  if (x < 0 || y < 0 || x >= g.size || y >= g.size) {
+    return;
+  }
+  uint8_t* p = g.buffer + ((size_t)y * (size_t)g.size + (size_t)x) * 3U;
+  const uint16_t c = lv_color_to16(lv_color_hex(color));
+  p[0] = (uint8_t)(c & 0xFF);
+  p[1] = (uint8_t)(c >> 8);
+  p[2] = opa;
+}
+
+void segArcDrawSegment(SegArc& g, int index, bool active) {
+  if (g.buffer == nullptr) {
+    return;
+  }
+
+  const float a0 = g.startDeg + (float)index * g.periodDeg;
+  const float midAngle = a0 + g.dashDeg * 0.5f;
+  const float midRad = midAngle * 3.14159265f / 180.0f;
+  const int center = g.size / 2;
+  const int mx = (int)(center + cosf(midRad) * (float)g.radius + 0.5f);
+  const int my = (int)(center + sinf(midRad) * (float)g.radius + 0.5f);
+  const float halfW = (float)SEG_W * 0.5f;
+  const float halfH = (float)g.width * 0.5f;
+  const float corner = (float)SEG_RADIUS;
+  const float hx = halfW - corner;
+  const float hy = halfH - corner;
+  const float rOuter = (float)g.radius + halfH;
+  const float rInner = (float)g.radius - halfH;
+  const float fadeLen = (float)g.width;
+
+  const float midValue =
+      g.scaleMin + (g.scaleMax - g.scaleMin) *
+                       ((float)index + 0.5f) / (float)g.segmentCount;
+  const uint32_t base = g.colorFn != nullptr ? g.colorFn(midValue) : 0xFFFFFFU;
+
+  const int half = g.width / 2 + 4;
+  for (int y = my - half; y <= my + half; ++y) {
+    for (int x = mx - half; x <= mx + half; ++x) {
+      const float dx = (float)x - (float)center;
+      const float dy = (float)y - (float)center;
+      const float rr = sqrtf(dx * dx + dy * dy);
+      if (rr < rInner - 1.0f || rr > rOuter + 1.0f) {
+        continue;
+      }
+
+      float ang = atan2f(dy, dx) * 180.0f / 3.14159265f;
+      if (ang < 0.0f) {
+        ang += 360.0f;
+      }
+      float local = ang - g.startDeg;
+      if (local < 0.0f) {
+        local += 360.0f;
+      }
+      if (local > g.sweepDeg + 1.0f) {
+        continue;
+      }
+
+      const float segLocal = local - (float)index * g.periodDeg;
+      const float arcPos = segLocal * 3.14159265f / 180.0f * rr;
+      const float u = arcPos - halfW;
+      const float v = rr - (float)g.radius;
+      const float ax = fabsf(u);
+      const float ay = fabsf(v);
+
+      bool inside;
+      if (ax <= halfW && ay <= halfH) {
+        if (ax <= hx || ay <= hy) {
+          inside = true;
+        } else {
+          const float cx = ax - hx;
+          const float cy = ay - hy;
+          inside = (cx * cx + cy * cy <= corner * corner);
+        }
+      } else {
+        inside = false;
+      }
+      if (!inside) {
+        continue;
+      }
+
+      uint32_t color;
+      lv_opa_t opa;
+      if (active) {
+        const float distOuter = rOuter - rr;
+        float t = 1.0f - distOuter / fadeLen;
+        if (t < 0.0f) {
+          t = 0.0f;
+        }
+        color = lerpColor(0x000000U, base, t);
+        opa = LV_OPA_COVER;
+      } else {
+        const float t = (rOuter - rr) / (float)g.width;
+        color = lerpColor(0x000000U, SEG_GREY, 1.0f - t);
+        opa = (lv_opa_t)(30.0f + 70.0f * (1.0f - t));
+      }
+      segArcWritePixel(g, x, y, color, opa);
+    }
+  }
+}
+
+void segArcDrawAll(SegArc& g, int lit) {
+  for (int i = 0; i < g.segmentCount; ++i) {
+    segArcDrawSegment(g, i, i < lit);
+  }
+}
+
+void segArcUpdate(SegArc& g, float frac) {
+  if (g.buffer == nullptr) {
+    return;
+  }
+  if (frac < 0.0f) {
+    frac = 0.0f;
+  }
+  if (frac > 1.0f) {
+    frac = 1.0f;
+  }
+
+  int lit = (int)(frac * (float)g.segmentCount + 0.5f);
+  if (lit < 0) {
+    lit = 0;
+  }
+  if (lit > g.segmentCount) {
+    lit = g.segmentCount;
+  }
+
+  const uint32_t sample = g.colorFn != nullptr ? g.colorFn(0.0f) : 0;
+  if (sample != g.lastSample) {
+    g.lastSample = sample;
+    g.lit = -1;
+  }
+  if (lit == g.lit) {
+    return;
+  }
+
+  if (g.lit < 0) {
+    segArcDrawAll(g, lit);
+  } else {
+    const int from = LV_MIN(g.lit, lit);
+    const int to = LV_MAX(g.lit, lit);
+    for (int i = from; i < to; ++i) {
+      segArcDrawSegment(g, i, i < lit);
+    }
+  }
+  g.lit = lit;
+  lv_obj_invalidate(g.canvas);
+}
+
+void createSegArc(lv_obj_t* parent, SegArc& g, int cx, int cy, int radius,
+                  int width, float startDeg, float sweepDeg, float scaleMin,
+                  float scaleMax, uint32_t (*colorFn)(float)) {
+  g.radius = radius;
+  g.width = width;
+  g.startDeg = startDeg;
+  g.sweepDeg = sweepDeg;
+  g.scaleMin = scaleMin;
+  g.scaleMax = scaleMax;
+  g.colorFn = colorFn;
+
+  const float arcLen = sweepDeg * 3.14159265f / 180.0f * (float)radius;
+  g.segmentCount = (int)(arcLen / (float)(SEG_W + SEG_GAP));
+  if (g.segmentCount < 1) {
+    g.segmentCount = 1;
+  }
+  g.dashDeg = (float)SEG_W / (float)radius * 180.0f / 3.14159265f;
+  g.periodDeg = (float)(SEG_W + SEG_GAP) / (float)radius * 180.0f /
+                3.14159265f;
+
+  g.size = 2 * (radius + width / 2 + 2);
+  const size_t bytes = LV_CANVAS_BUF_SIZE_TRUE_COLOR_ALPHA(g.size, g.size);
+  void* buf = allocGradientBuffer(bytes);
+  if (buf == nullptr) {
+    return;
+  }
+  g.buffer = (uint8_t*)buf;
+
+  lv_obj_t* canvas = lv_canvas_create(parent);
+  lv_canvas_set_buffer(canvas, buf, g.size, g.size,
+                       LV_IMG_CF_TRUE_COLOR_ALPHA);
+  lv_obj_set_pos(canvas, cx - g.size / 2, cy - g.size / 2);
+  lv_obj_clear_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
+  lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_TRANSP);
+  g.canvas = canvas;
+
+  segArcDrawAll(g, 0);
+  g.lit = 0;
+  g.lastSample = colorFn != nullptr ? colorFn(0.0f) : 0;
+  lv_obj_invalidate(canvas);
+}
+
+void segBarStyle(SegBar& b, int index, bool active) {
+  if (b.segments[index] == nullptr) {
+    return;
+  }
+  const float value =
+      b.scaleMin + (b.scaleMax - b.scaleMin) *
+                       ((float)index + 0.5f) / (float)b.count;
+  const uint32_t color = active ? b.colorFn(value) : SEG_GREY;
+  lv_obj_set_style_bg_color(b.segments[index], lv_color_hex(color), 0);
+  lv_obj_set_style_bg_grad_color(b.segments[index], lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_grad_dir(b.segments[index], LV_GRAD_DIR_VER, 0);
+  lv_obj_set_style_bg_opa(b.segments[index], active ? LV_OPA_COVER : 90, 0);
+}
+
+void segBarUpdate(SegBar& b, float frac) {
+  if (b.root == nullptr) {
+    return;
+  }
+  if (frac < 0.0f) {
+    frac = 0.0f;
+  }
+  if (frac > 1.0f) {
+    frac = 1.0f;
+  }
+  int lit = (int)(frac * (float)b.count + 0.5f);
+  if (lit < 0) {
+    lit = 0;
+  }
+  if (lit > b.count) {
+    lit = b.count;
+  }
+  if (lit == b.lit) {
+    return;
+  }
+  const int from = LV_MIN(b.lit, lit);
+  const int to = LV_MAX(b.lit, lit);
+  for (int i = from; i < to; ++i) {
+    segBarStyle(b, i, i < lit);
+  }
+  b.lit = lit;
+}
+
+void createSegBar(lv_obj_t* parent, SegBar& b, int x, int y, int w, int h,
+                  float scaleMin, float scaleMax,
+                  uint32_t (*colorFn)(float)) {
+  b.scaleMin = scaleMin;
+  b.scaleMax = scaleMax;
+  b.colorFn = colorFn;
+
+  b.root = lv_obj_create(parent);
+  lv_obj_remove_style_all(b.root);
+  lv_obj_set_pos(b.root, x, y);
+  lv_obj_set_size(b.root, w, h);
+  lv_obj_set_style_bg_opa(b.root, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(b.root, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(b.root, LV_OBJ_FLAG_CLICKABLE);
+
+  b.count = (w + SEG_GAP) / (SEG_W + SEG_GAP);
+  if (b.count > 16) {
+    b.count = 16;
+  }
+  const int total = b.count * SEG_W + (b.count - 1) * SEG_GAP;
+  const int start = (w - total) / 2;
+
+  for (int i = 0; i < b.count; ++i) {
+    lv_obj_t* seg = lv_obj_create(b.root);
+    lv_obj_remove_style_all(seg);
+    lv_obj_set_pos(seg, start + i * (SEG_W + SEG_GAP), 0);
+    lv_obj_set_size(seg, SEG_W, h);
+    lv_obj_set_style_radius(seg, SEG_RADIUS, 0);
+    lv_obj_clear_flag(seg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(seg, LV_OBJ_FLAG_CLICKABLE);
+    b.segments[i] = seg;
+    segBarStyle(b, i, false);
+  }
+  b.lit = 0;
+}
+
+void createClassicSegmentedOverlays(lv_obj_t* parent) {
+  g_segOverlay = lv_obj_create(parent);
+  lv_obj_remove_style_all(g_segOverlay);
+  lv_obj_set_pos(g_segOverlay, 0, 0);
+  lv_obj_set_size(g_segOverlay, LV_HOR_RES, LV_VER_RES);
+  lv_obj_set_style_bg_opa(g_segOverlay, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(g_segOverlay, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(g_segOverlay, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_flag(g_segOverlay, LV_OBJ_FLAG_HIDDEN);
+
+  const int speedCx = 242 + SPEED_SIZE / 2;
+  const int speedCy = 75 + SPEED_SIZE / 2;
+  createSegArc(g_segOverlay, g_speedSeg, speedCx, speedCy, SPEED_SIZE / 2, 22,
+               135.0f, 270.0f, 0.0f, 180.0f, speedSegColor);
+
+  const int rpmCx = 576 + SIDE_SIZE / 2;
+  const int rpmCy = 125 + SIDE_SIZE / 2;
+  createSegArc(g_segOverlay, g_tachSeg, rpmCx, rpmCy, SIDE_SIZE / 2, 14,
+               135.0f, 270.0f, 0.0f, 5500.0f, rpmColor);
+
+  createSegBar(g_segOverlay, g_tempSeg, 14, 376, 210, 16, 40.0f, 130.0f,
+               tempBarColor);
+  createSegBar(g_segOverlay, g_fuelSeg, 576, 376, 210, 16, 0.0f, 100.0f,
+               fuelBarColor);
+}
+
+void applySegmentedValues(const Values& v) {
+  segArcUpdate(g_speedSeg, v.speedValid ? v.speedKmh / 180.0f : 0.0f);
+  segArcUpdate(g_tachSeg, v.rpmValid ? v.rpm / 5500.0f : 0.0f);
+
+  float tempFrac = 0.0f;
+  if (v.coolantValid) {
+    float t = v.coolantC;
+    if (t < 40.0f) {
+      t = 40.0f;
+    }
+    if (t > 130.0f) {
+      t = 130.0f;
+    }
+    tempFrac = (t - 40.0f) / 90.0f;
+  }
+  segBarUpdate(g_tempSeg, tempFrac);
+  segBarUpdate(g_fuelSeg, v.fuelValid ? v.fuelPct / 100.0f : 0.0f);
+}
+
+void setClassicSegmented(bool segmented) {
+  if (segmented == g_classicSegmented) {
+    return;
+  }
+  g_classicSegmented = segmented;
+
+  const lv_obj_flag_t flag =
+      segmented ? LV_OBJ_FLAG_HIDDEN : (lv_obj_flag_t)0;
+  auto setFlag = [](lv_obj_t* obj, lv_obj_flag_t f) {
+    if (obj == nullptr) {
+      return;
+    }
+    if (f) {
+      lv_obj_add_flag(obj, f);
+    } else {
+      lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    }
+  };
+
+  setFlag(g_speed.arc, flag);
+  setFlag(g_rpm.arc, flag);
+  setFlag(g_rpm.redline, flag);
+  setFlag(g_rpm.ring, flag);
+  setFlag(g_rpm.cover, flag);
+  setFlag(g_tempGradient, flag);
+  setFlag(g_fuelGradient, flag);
+
+  if (g_segOverlay != nullptr) {
+    if (segmented) {
+      lv_obj_clear_flag(g_segOverlay, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_add_flag(g_segOverlay, LV_OBJ_FLAG_HIDDEN);
+    }
+  }
+}
+
 lv_obj_t* createSplash(lv_obj_t* parent) {
   lv_obj_t* splash = lv_obj_create(parent);
   lv_obj_remove_style_all(splash);
@@ -843,20 +1269,133 @@ void setGearVisible(bool visible) {
   }
 }
 
+void designMenuUpdateSelection() {
+  for (int i = 0; i < kDesignCount; ++i) {
+    if (g_designRows[i] == nullptr) {
+      continue;
+    }
+    const bool selected = (i == g_currentDesign);
+    lv_obj_set_style_bg_color(
+        g_designRows[i], lv_color_hex(selected ? COL_TRACK : 0x11161B), 0);
+    lv_obj_set_style_border_width(g_designRows[i], selected ? 2 : 1, 0);
+    lv_obj_set_style_border_color(
+        g_designRows[i], lv_color_hex(selected ? COL_CYAN : COL_TRACK), 0);
+  }
+}
+
+void designMenuHide() {
+  if (g_designMenu != nullptr) {
+    lv_obj_add_flag(g_designMenu, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+void applyDesign(int index) {
+  if (index < 0 || index >= kDesignCount) {
+    return;
+  }
+  g_currentDesign = index;
+  if (index == 0) {
+    ui::internal::designBSetVisible(false);
+    ui::internal::designDSetVisible(false);
+    lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    setClassicSegmented(false);
+    applyValues(g_lastValues);
+  } else if (index == 1) {
+    ui::internal::designBSetVisible(false);
+    ui::internal::designDSetVisible(false);
+    lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    setClassicSegmented(true);
+    applyValues(g_lastValues);
+    applySegmentedValues(g_lastValues);
+  } else if (index == 2) {
+    lv_obj_add_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    ui::internal::designDSetVisible(false);
+    ui::internal::designBSetVisible(true);
+    ui::internal::designBUpdate(g_lastValues);
+  } else {
+    lv_obj_add_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
+    ui::internal::designBSetVisible(false);
+    ui::internal::designDSetVisible(true);
+    ui::internal::designDUpdate(g_lastValues);
+  }
+  designMenuUpdateSelection();
+}
+
+void designRowCb(lv_event_t* e) {
+  const int index = (int)(intptr_t)lv_event_get_user_data(e);
+  applyDesign(index);
+  designMenuHide();
+}
+
+void designBackdropCb(lv_event_t* /*e*/) {
+  designMenuHide();
+}
+
+lv_obj_t* createDesignMenu() {
+  lv_obj_t* backdrop = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(backdrop);
+  lv_obj_set_size(backdrop, LV_HOR_RES, LV_VER_RES);
+  lv_obj_set_pos(backdrop, 0, 0);
+  lv_obj_set_style_bg_color(backdrop, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(backdrop, (lv_opa_t)170, 0);
+  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(backdrop, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(backdrop, designBackdropCb, LV_EVENT_CLICKED, nullptr);
+  lv_obj_add_flag(backdrop, LV_OBJ_FLAG_HIDDEN);
+
+  lv_obj_t* panel = lv_obj_create(backdrop);
+  lv_obj_remove_style_all(panel);
+  lv_obj_set_size(panel, 320, 312);
+  lv_obj_center(panel);
+  lv_obj_set_style_bg_color(panel, lv_color_hex(0x141A20), 0);
+  lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(panel, 16, 0);
+  lv_obj_set_style_border_width(panel, 1, 0);
+  lv_obj_set_style_border_color(panel, lv_color_hex(COL_TRACK), 0);
+  lv_obj_add_flag(panel, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t* title = makeLabel(panel, "DESIGN", &lv_font_montserrat_24, COL_TEXT);
+  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 16);
+
+  const char* names[kDesignCount] = {"CLASSIC", "CLASSIC+", "COMPACT", "WELLS"};
+  for (int i = 0; i < kDesignCount; ++i) {
+    lv_obj_t* row = lv_obj_create(panel);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_pos(row, 30, 56 + i * 56);
+    lv_obj_set_size(row, 260, 44);
+    lv_obj_set_style_bg_color(row, lv_color_hex(0x11161B), 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(row, 10, 0);
+    lv_obj_set_style_border_width(row, 1, 0);
+    lv_obj_set_style_border_color(row, lv_color_hex(COL_TRACK), 0);
+    lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(row, designRowCb, LV_EVENT_CLICKED,
+                        (void*)(intptr_t)i);
+    lv_obj_t* label = makeLabel(row, names[i], &lv_font_montserrat_20, COL_TEXT);
+    lv_obj_center(label);
+    g_designRows[i] = row;
+  }
+
+  lv_obj_move_foreground(backdrop);
+  return backdrop;
+}
+
+void designMenuShow() {
+  if (g_designMenu == nullptr || ui::internal::byeActive()) {
+    return;
+  }
+  designMenuUpdateSelection();
+  lv_obj_clear_flag(g_designMenu, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(g_designMenu);
+}
+
 void gearCb(lv_event_t* /*e*/) {
   if (ui::internal::byeActive()) {
     return;
   }
-  g_designBActive = !g_designBActive;
-  if (g_designBActive) {
-    lv_obj_add_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
-    ui::internal::designBSetVisible(true);
-    ui::internal::designBUpdate(g_lastValues);
-  } else {
-    ui::internal::designBSetVisible(false);
-    lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_HIDDEN);
-    applyValues(g_lastValues);
-  }
+  designMenuShow();
 }
 
 }  // namespace
@@ -881,6 +1420,8 @@ void init() {
   lv_obj_set_style_bg_opa(g_designA, LV_OPA_TRANSP, 0);
   lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_clear_flag(g_designA, LV_OBJ_FLAG_CLICKABLE);
+
+  createClassicSegmentedOverlays(g_designA);
 
   // Status icons follow an arc concentric with the speedometer.
   g_iconOil = createOrbitIcon(g_designA, &icon_oil, 0);
@@ -999,6 +1540,7 @@ void init() {
   lv_obj_clear_flag(g_fuelOutline, LV_OBJ_FLAG_CLICKABLE);
 
   ui::internal::designBInit(screen);
+  ui::internal::designDInit(screen);
 
   g_splash = createSplash(screen);
   ui::internal::byeInit(screen);
@@ -1046,12 +1588,14 @@ void init() {
 
   ui::internal::clockSettingsInit();
   g_colorMenu = createColorMenu();
+  g_designMenu = createDesignMenu();
 }
 
 void update(const Values& v) {
   if (ui::internal::byeUpdate(v.ignitionOn)) {
     ui::internal::clockHideSettings();
     colorMenuHide();
+    designMenuHide();
     setGearVisible(false);
     return;
   }
@@ -1122,10 +1666,15 @@ void update(const Values& v) {
   g_selfTestActive = false;
   setGearVisible(true);
   g_lastValues = v;
-  if (g_designBActive) {
+  if (g_currentDesign == 2) {
     ui::internal::designBUpdate(v);
+  } else if (g_currentDesign == 3) {
+    ui::internal::designDUpdate(v);
   } else {
     applyValues(v);
+    if (g_currentDesign == 1) {
+      applySegmentedValues(v);
+    }
   }
 }
 
