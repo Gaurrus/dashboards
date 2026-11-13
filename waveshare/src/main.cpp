@@ -78,15 +78,16 @@ void setup() {
 
   Board* board = new Board();
   board->init();
-#if LVGL_PORT_AVOID_TEARING_MODE
+
   auto lcd = board->getLCD();
+#if LVGL_PORT_AVOID_TEARING_MODE
   lcd->configFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
+#endif
 #if ESP_PANEL_DRIVERS_BUS_ENABLE_RGB && CONFIG_IDF_TARGET_ESP32S3
   auto lcd_bus = lcd->getBus();
   if (lcd_bus->getBasicAttributes().type == ESP_PANEL_BUS_TYPE_RGB) {
-    static_cast<BusRGB*>(lcd_bus)->configRGB_BounceBufferSize(lcd->getFrameWidth() * 10);
+    static_cast<BusRGB*>(lcd_bus)->configRGB_BounceBufferSize(lcd->getFrameWidth() * 20);
   }
-#endif
 #endif
   assert(board->begin());
 

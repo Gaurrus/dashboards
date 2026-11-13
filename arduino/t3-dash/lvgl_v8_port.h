@@ -49,7 +49,7 @@
 #define LVGL_PORT_TASK_STACK_SIZE               (6 * 1024)  // The stack size of the LVGL timer task, in bytes
 #define LVGL_PORT_TASK_PRIORITY                 (3)         // The priority of the LVGL timer task
 #ifdef ARDUINO_RUNNING_CORE
-#define LVGL_PORT_TASK_CORE                     (0)                     // Pinned to core 0
+#define LVGL_PORT_TASK_CORE                     (ARDUINO_RUNNING_CORE)  // Same core as board/loop
 #else
 #define LVGL_PORT_TASK_CORE                     (0)                     // Valid if using ESP-IDF
 #endif
